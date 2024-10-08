@@ -57,3 +57,26 @@ func UploadFileToS3(bucket, key, filePath string) (*s3.PutObjectOutput, error) {
 	log.Printf("File uploaded to S3: s3://%s/%s", bucket, key)
 	return result, nil
 }
+
+func GetObjectETag(accountID, bucketName, key string) (string, error) {
+	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("eu-west-1"))
+	if err != nil {
+		log.Printf("Failed to load AWS config: %v", err)
+		return "", err
+	}
+	client := s3.NewFromConfig(cfg)
+
+	input := &s3.HeadObjectInput{
+		Bucket: aws.String(bucketName),
+		Key:    aws.String(key),
+	}
+
+	ctx := context.Background()
+	result, err := client.HeadObject(ctx, input)
+	if err != nil {
+		log.Printf("Failed to get object ETag: %v", err)
+		return "", err
+	}
+
+	return *result.ETag, nil
+}

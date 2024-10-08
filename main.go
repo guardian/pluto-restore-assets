@@ -64,6 +64,12 @@ func ProjectRestoreHandler(w http.ResponseWriter, r *http.Request, bucketName, p
 
 }
 
+// Add this new struct for the response
+type RestoreResponse struct {
+	Message string `json:"message"`
+	JobID   string `json:"job_id"`
+}
+
 func main() {
 	bucketName := "archivehunter-test-media"
 	manifestKey := "batch-manifests/manifest.csv"
@@ -90,6 +96,43 @@ func main() {
 			http.Error(w, "Failed to upload manifest", http.StatusInternalServerError)
 			return
 		}
+		// initiate s3 batch restore
+		accountID, err := s3utils.GetAWSAccountID("eu-west-1")
+		if err != nil {
+			log.Printf("Failed to get AWS Account ID: %v", err)
+			http.Error(w, "Failed to get AWS Account ID", http.StatusInternalServerError)
+			return
+		}
+
+		manifestETag, err := s3utils.GetObjectETag(accountID, bucketName, manifestKey)
+		if err != nil {
+			log.Printf("Failed to get manifest ETag: %v", err)
+			return
+		}
+		jobID, err := s3utils.InitiateS3BatchRestore(accountID, bucketName, manifestKey, manifestETag)
+		if err != nil {
+			log.Printf("Failed to initiate S3 Batch Restore: %v", err)
+			http.Error(w, "Failed to initiate S3 Batch Restore", http.StatusInternalServerError)
+			return
+		}
+		log.Printf("S3 Batch Restore initiated with job ID: %s", jobID)
+
+		// Prepare and send the response immediately
+		response := RestoreResponse{
+			Message: "S3 Batch Restore initiated",
+			JobID:   jobID,
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(response)
+
+		// Start monitoring and downloading in a separate goroutine
+		go func() {
+			log.Println("Monitoring S3 Batch Restore job")
+			if err := s3utils.MonitorObjectRestoreStatus(); err != nil {
+				log.Printf("Failed to monitor S3 Batch Restore job: %v", err)
+			}
+		}()
 
 	})))
 
@@ -98,32 +141,5 @@ func main() {
 		// Log if the server fails to start or stops unexpectedly
 		log.Fatalf("Server failed to start: %v", err)
 	}
-
-	// Log successful server shutdown (unlikely in normal execution due to Fatal above)
 	log.Println("Server shut down successfully")
-
-	// // Upload manifest to S3
-	// etag, err := s3utils.UploadFileToS3(bucketName, manifestKey, manifestLocalPath)
-	// if err != nil {
-	// 	log.Fatalf("Failed to upload manifest: %v", err)
-	// }
-
-	// // Get AWS Account ID programmatically
-	// accountID, err := s3utils.GetAWSAccountID()
-	// if err != nil {
-	// 	log.Fatalf("Failed to get AWS Account ID: %v", err)
-	// }
-
-	// // Initiate S3 Batch Operations job
-	// jobID, err := s3utils.InitiateS3BatchRestore(accountID, bucketName, manifestKey, etag)
-	// if err != nil {
-	// 	log.Fatalf("Failed to initiate S3 Batch Operations job: %v", err)
-	// }
-
-	// // Monitor job status
-	// if err := s3utils.MonitorBatchJob(accountID, jobID); err != nil {
-	// 	log.Fatalf("Batch job monitoring failed: %v", err)
-	// }
-
-	// log.Println("All tasks completed successfully.")
 }

@@ -1,51 +1,151 @@
 package s3utils
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"log"
+	"math/rand"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/s3control"
-	"github.com/aws/aws-sdk-go-v2/service/s3control/types"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/cenkalti/backoff/v4"
 )
 
-func MonitorBatchJob(accountID, jobID string) error {
-	log.Printf("Monitoring S3 Batch Operations job: %s", jobID)
+// func MonitorBatchJob(accountID, jobID, bucketName string, objectKeys []string) error {
+// 	log.Printf("Monitoring restore status for objects in bucket: %s", bucketName)
 
-	cfg, err := config.LoadDefaultConfig(context.TODO())
+// 	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("eu-west-1"))
+// 	if err != nil {
+// 		return fmt.Errorf("failed to load AWS config: %w", err)
+// 	}
+
+// 	s3Client := s3.NewFromConfig(cfg)
+
+// 	startTime := time.Now()
+// 	log.Printf("Monitoring started at: %s", startTime)
+
+// 	return monitorObjectRestoreStatus(s3Client, bucketName, objectKeys)
+// }
+
+func MonitorObjectRestoreStatus() error {
+	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("eu-west-1"))
+	ctx := context.Background()
 	if err != nil {
-		return fmt.Errorf("failed to load AWS config: %w", err)
+		return err
 	}
 
-	client := s3control.NewFromConfig(cfg)
-	// add a start and finish time for the job
-	startTime := time.Now()
-	log.Printf("Job started at: %s", startTime)
+	client := s3.NewFromConfig(cfg)
+	keys, err := readManifestFile("/tmp/manifest.csv")
+	if err != nil {
+		return fmt.Errorf("failed to read manifest file: %v", err)
+	}
+
 	for {
-		resp, err := client.DescribeJob(context.TODO(), &s3control.DescribeJobInput{
-			AccountId: aws.String(accountID),
-			JobId:     aws.String(jobID),
+		allRestored := true
+		for _, key := range keys {
+			restored, err := checkRestoreStatus(ctx, client, key.Bucket, key.Key)
+			log.Printf("Checking restore status for %s/%s: %v, %v", key.Bucket, key.Key, restored, err)
+			if err != nil {
+				log.Printf("Error checking restore status for %s/%s: %v", key.Bucket, key.Key, err)
+				allRestored = false
+				continue
+			}
+			if !restored {
+				allRestored = false
+			}
+		}
+
+		if allRestored {
+			log.Println("All objects restored successfully")
+			if err := DownloadFiles(ctx, client, keys); err != nil {
+				return fmt.Errorf("failed to download files: %w", err)
+			}
+			return nil
+		}
+
+		// Wait before next check, with some randomization to spread out requests Wait 15-45 minutes
+		sleepDuration := time.Duration(15+rand.Intn(30)) * time.Minute
+		log.Printf("Not all objects restored yet. Waiting %v before next check...", sleepDuration)
+		time.Sleep(sleepDuration)
+	}
+}
+
+func DownloadFiles(ctx context.Context, client *s3.Client, keys []S3Entry) error {
+	log.Printf("Downloading %d files", len(keys))
+	log.Printf("Files: %v", keys)
+	// for _, key := range keys {
+	// 	downloadPath := fmt.Sprintf("/tmp/%s", key.Key)
+	// 	err := downloadFile(ctx, client, key.Bucket, key.Key, downloadPath)
+	// 	if err != nil {
+	// 		return fmt.Errorf("failed to download file %s/%s: %w", key.Bucket, key.Key, err)
+	// 	}
+	return nil
+}
+
+type S3Entry struct {
+	Bucket string
+	Key    string
+}
+
+func readManifestFile(filepath string) ([]S3Entry, error) {
+	file, err := os.Open(filepath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var entries []S3Entry
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		parts := strings.Split(scanner.Text(), ",")
+		if len(parts) == 2 {
+			entries = append(entries, S3Entry{Bucket: parts[0], Key: parts[1]})
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+
+	return entries, nil
+}
+
+func checkRestoreStatus(ctx context.Context, client *s3.Client, bucket, key string) (bool, error) {
+	operation := func() (bool, error) {
+		resp, err := client.HeadObject(ctx, &s3.HeadObjectInput{
+			Bucket: aws.String(bucket),
+			Key:    aws.String(key),
 		})
 		if err != nil {
-			return fmt.Errorf("failed to describe batch job: %w", err)
+			return false, err
 		}
 
-		status := resp.Job.Status
-		log.Printf("Job status: %s", status)
-
-		if status == types.JobStatusComplete {
-			log.Printf("Batch job completed successfully at %v", time.Now())
-			break
-		} else if status == types.JobStatusFailed || status == types.JobStatusCancelled {
-			return fmt.Errorf("batch job failed or was cancelled")
+		if resp.Restore == nil {
+			return false, nil
 		}
 
-		time.Sleep(15 * time.Minute)
-		log.Printf("Time elapsed: %s", time.Since(startTime))
+		return !strings.Contains(*resp.Restore, "ongoing-request=\"true\""), nil
 	}
 
-	return nil
+	b := backoff.NewExponentialBackOff()
+	b.InitialInterval = 1 * time.Second
+	b.MaxInterval = 30 * time.Second
+	b.MaxElapsedTime = 5 * time.Minute
+	b.RandomizationFactor = 0.5
+
+	var restored bool
+	err := backoff.RetryNotify(func() error {
+		var opErr error
+		restored, opErr = operation()
+		return opErr
+	}, b, func(err error, d time.Duration) {
+		log.Printf("Retrying after error: %v", err)
+	})
+
+	return restored, err
 }

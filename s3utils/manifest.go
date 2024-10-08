@@ -42,13 +42,6 @@ func GenerateCSVManifest(bucket, prefix, filePath string) error {
 	writer := csv.NewWriter(file)
 	defer writer.Flush()
 
-	// Write CSV header
-	// For S3 Batch Operations, no header is required, but including one if needed.
-	// err = writer.Write([]string{"Bucket", "Key"})
-	// if err != nil {
-	//     return fmt.Errorf("failed to write CSV header: %w", err)
-	// }
-
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(context.TODO())
 		if err != nil {

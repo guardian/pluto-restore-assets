@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -15,6 +16,8 @@ import (
 
 func InitiateS3BatchRestore(accountID, bucketName, manifestKey, manifestETag string) (string, error) {
 	log.Println("Initiating S3 Batch Operations job...")
+
+	clientRequestToken := uuid.New().String()
 
 	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("eu-west-1"))
 	if err != nil {
@@ -41,7 +44,7 @@ func InitiateS3BatchRestore(accountID, bucketName, manifestKey, manifestETag str
 		Operation: &types.JobOperation{
 			S3InitiateRestoreObject: &types.S3InitiateRestoreObjectOperation{
 				ExpirationInDays: aws.Int32(7),
-				GlacierJobTier:   types.S3GlacierJobTierBulk,
+				GlacierJobTier:   types.S3GlacierJobTierStandard, // Can use Bulk for cheaper but slower, Expedited for faster but more expensive
 			},
 		},
 		Priority: aws.Int32(10),
@@ -52,14 +55,9 @@ func InitiateS3BatchRestore(accountID, bucketName, manifestKey, manifestETag str
 			Format:      types.JobReportFormatReportCsv20180820,
 			ReportScope: types.JobReportScopeAllTasks,
 		},
-		RoleArn: aws.String("<your-s3-batch-operations-role-arn>"),
-		// Is the line below correct?
-		// ClientRequestToken: aws.String("restore-job-token"),
-		// TODO: Generate a random UUID and use it as the ClientRequestToken
-		// use a random UUID for the ClientRequestToken
-		ClientRequestToken: aws.String(uuid.New().String()),
+		RoleArn: aws.String("arn:aws:iam::855023211239:role/test-project-restore"),
 
-		// ClientRequestToken: aws.String("restore-job-token"),
+		ClientRequestToken: aws.String(clientRequestToken),
 	}
 
 	result, err := client.CreateJob(context.TODO(), jobInput)
@@ -69,5 +67,50 @@ func InitiateS3BatchRestore(accountID, bucketName, manifestKey, manifestETag str
 
 	jobID := aws.ToString(result.JobId)
 	log.Printf("S3 Batch Operations job created. Job ID: %s", jobID)
+
+	// Wait for the job to be in a state where we can update it
+	err = waitForJobReadyToUpdate(client, accountID, jobID)
+	if err != nil {
+		return "", fmt.Errorf("failed to wait for job to be ready: %w", err)
+	}
+
+	// Now update the job status to Ready
+	updateInput := &s3control.UpdateJobStatusInput{
+		AccountId:          aws.String(accountID),
+		JobId:              aws.String(jobID),
+		RequestedJobStatus: types.RequestedJobStatusReady,
+	}
+
+	_, err = client.UpdateJobStatus(context.TODO(), updateInput)
+	if err != nil {
+		return "", fmt.Errorf("failed to start S3 Batch Operations job: %w", err)
+	}
+
+	log.Printf("S3 Batch Operations job %s has been automatically started", jobID)
+
 	return jobID, nil
+}
+
+func waitForJobReadyToUpdate(client *s3control.Client, accountID, jobID string) error {
+	maxAttempts := 10
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		describeInput := &s3control.DescribeJobInput{
+			AccountId: aws.String(accountID),
+			JobId:     aws.String(jobID),
+		}
+
+		describeOutput, err := client.DescribeJob(context.TODO(), describeInput)
+		if err != nil {
+			return fmt.Errorf("failed to describe job: %w", err)
+		}
+
+		if describeOutput.Job.Status == types.JobStatusSuspended {
+			return nil // Job is ready to be updated
+		}
+
+		log.Printf("Waiting for job to be ready for update. Current status: %s", describeOutput.Job.Status)
+		time.Sleep(1 * time.Second)
+	}
+
+	return fmt.Errorf("job did not reach updateable state within expected time")
 }
