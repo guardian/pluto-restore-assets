@@ -45,22 +45,25 @@ func MonitorObjectRestoreStatus() error {
 		return fmt.Errorf("failed to read manifest file: %v", err)
 	}
 
-	for {
-		allRestored := true
-		for _, key := range keys {
+	log.Printf("Monitoring %d objects", len(keys))
+	remainingKeys := keys
+	for len(remainingKeys) > 0 {
+		var stillRestoring []S3Entry
+		for _, key := range remainingKeys {
 			restored, err := checkRestoreStatus(ctx, client, key.Bucket, key.Key)
-			log.Printf("Checking restore status for %s/%s: %v, %v", key.Bucket, key.Key, restored, err)
 			if err != nil {
 				log.Printf("Error checking restore status for %s/%s: %v", key.Bucket, key.Key, err)
-				allRestored = false
+				stillRestoring = append(stillRestoring, key)
 				continue
 			}
 			if !restored {
-				allRestored = false
+				stillRestoring = append(stillRestoring, key)
+			} else {
+				log.Printf("Object %s/%s has been restored", key.Bucket, key.Key)
 			}
 		}
 
-		if allRestored {
+		if len(stillRestoring) == 0 {
 			log.Println("All objects restored successfully")
 			if err := DownloadFiles(ctx, client, keys); err != nil {
 				return fmt.Errorf("failed to download files: %w", err)
@@ -68,11 +71,12 @@ func MonitorObjectRestoreStatus() error {
 			return nil
 		}
 
-		// Wait before next check, with some randomization to spread out requests Wait 15-45 minutes
+		remainingKeys = stillRestoring
 		sleepDuration := time.Duration(15+rand.Intn(30)) * time.Minute
-		log.Printf("Not all objects restored yet. Waiting %v before next check...", sleepDuration)
+		log.Printf("%d objects still restoring. Waiting %v before next check...", len(remainingKeys), sleepDuration)
 		time.Sleep(sleepDuration)
 	}
+	return nil
 }
 
 func DownloadFiles(ctx context.Context, client *s3.Client, keys []S3Entry) error {
