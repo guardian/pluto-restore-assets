@@ -11,35 +11,11 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/cenkalti/backoff/v4"
 )
 
-// func MonitorBatchJob(accountID, jobID, bucketName string, objectKeys []string) error {
-// 	log.Printf("Monitoring restore status for objects in bucket: %s", bucketName)
-
-// 	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("eu-west-1"))
-// 	if err != nil {
-// 		return fmt.Errorf("failed to load AWS config: %w", err)
-// 	}
-
-// 	s3Client := s3.NewFromConfig(cfg)
-
-// 	startTime := time.Now()
-// 	log.Printf("Monitoring started at: %s", startTime)
-
-// 	return monitorObjectRestoreStatus(s3Client, bucketName, objectKeys)
-// }
-
-func MonitorObjectRestoreStatus() error {
-	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("eu-west-1"))
-	ctx := context.Background()
-	if err != nil {
-		return err
-	}
-
-	client := s3.NewFromConfig(cfg)
+func MonitorObjectRestoreStatus(ctx context.Context, client *s3.Client) error {
 	keys, err := readManifestFile("/tmp/manifest.csv")
 	if err != nil {
 		return fmt.Errorf("failed to read manifest file: %v", err)
@@ -119,7 +95,7 @@ func readManifestFile(filepath string) ([]S3Entry, error) {
 	return entries, nil
 }
 
-func checkRestoreStatus(ctx context.Context, client *s3.Client, bucket, key string) (bool, error) {
+func checkRestoreStatus(ctx context.Context, client S3Client, bucket, key string) (bool, error) {
 	operation := func() (bool, error) {
 		resp, err := client.HeadObject(ctx, &s3.HeadObjectInput{
 			Bucket: aws.String(bucket),
@@ -132,7 +108,6 @@ func checkRestoreStatus(ctx context.Context, client *s3.Client, bucket, key stri
 		if resp.Restore == nil {
 			return false, nil
 		}
-
 		return !strings.Contains(*resp.Restore, "ongoing-request=\"true\""), nil
 	}
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"github.com/google/uuid"
@@ -14,17 +15,20 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3control/types"
 )
 
-func InitiateS3BatchRestore(accountID, bucketName, manifestKey, manifestETag string) (string, error) {
+func InitiateS3BatchRestore(ctx context.Context, s3Client s3control.Client, accountID, bucketName, manifestKey, manifestETag string) (string, error) {
 	log.Println("Initiating S3 Batch Operations job...")
 
 	clientRequestToken := uuid.New().String()
 
-	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("eu-west-1"))
+	cfg, err := config.LoadDefaultConfig(context.TODO())
 	if err != nil {
 		return "", fmt.Errorf("failed to load AWS config: %w", err)
 	}
 
 	client := s3control.NewFromConfig(cfg)
+	// get roleArn from env
+	roleArn := os.Getenv("AWS_ROLE_ARN")
+	log.Println("roleArn", roleArn)
 
 	jobInput := &s3control.CreateJobInput{
 		AccountId: aws.String(accountID),
@@ -55,7 +59,7 @@ func InitiateS3BatchRestore(accountID, bucketName, manifestKey, manifestETag str
 			Format:      types.JobReportFormatReportCsv20180820,
 			ReportScope: types.JobReportScopeAllTasks,
 		},
-		RoleArn: aws.String("arn:aws:iam::855023211239:role/test-project-restore"),
+		RoleArn: aws.String(roleArn),
 
 		ClientRequestToken: aws.String(clientRequestToken),
 	}

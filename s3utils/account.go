@@ -6,15 +6,19 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 )
 
-// GetAWSAccountID retrieves the AWS Account ID using STS GetCallerIdentity
-// add a default region
-func GetAWSAccountID(region string) (string, error) {
-	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion(region))
+type S3Client interface {
+	HeadObject(ctx context.Context, params *s3.HeadObjectInput, optFns ...func(*s3.Options)) (*s3.HeadObjectOutput, error)
+	// Add other methods as needed
+}
+
+func GetAWSAccountID() (string, error) {
+	cfg, err := config.LoadDefaultConfig(context.TODO())
 	if err != nil {
-		return "", fmt.Errorf("failed to load AWS config: %w", err)
+		return "", fmt.Errorf("load AWS config: %w", err)
 	}
 
 	client := sts.NewFromConfig(cfg)

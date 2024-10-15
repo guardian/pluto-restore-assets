@@ -14,14 +14,14 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
-func GenerateCSVManifest(bucket, prefix, filePath string) error {
+func GenerateCSVManifest(ctx context.Context, s3Client *s3.Client, bucket, prefix, filePath string) error {
 	log.Printf("Generating CSV manifest for bucket: %s, prefix: %s", bucket, prefix)
 
 	if filePath == "" {
 		return fmt.Errorf("invalid file path: file path is empty")
 	}
 
-	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("eu-west-1"))
+	cfg, err := config.LoadDefaultConfig(context.TODO())
 	if err != nil {
 		return fmt.Errorf("failed to load AWS config: %w", err)
 	}

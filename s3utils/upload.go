@@ -14,7 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
-func UploadFileToS3(bucket, key, filePath string) (*s3.PutObjectOutput, error) {
+func UploadFileToS3(ctx context.Context, s3Client *s3.Client, bucket, key, filePath string) (*s3.PutObjectOutput, error) {
 	log.Printf("Uploading file to S3: s3://%s/%s", bucket, key)
 
 	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("eu-west-1"))
@@ -58,21 +58,14 @@ func UploadFileToS3(bucket, key, filePath string) (*s3.PutObjectOutput, error) {
 	return result, nil
 }
 
-func GetObjectETag(accountID, bucketName, key string) (string, error) {
-	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("eu-west-1"))
-	if err != nil {
-		log.Printf("Failed to load AWS config: %v", err)
-		return "", err
-	}
-	client := s3.NewFromConfig(cfg)
+func GetObjectETag(ctx context.Context, s3Client *s3.Client, accountID, bucketName, key string) (string, error) {
 
 	input := &s3.HeadObjectInput{
 		Bucket: aws.String(bucketName),
 		Key:    aws.String(key),
 	}
 
-	ctx := context.Background()
-	result, err := client.HeadObject(ctx, input)
+	result, err := s3Client.HeadObject(ctx, input)
 	if err != nil {
 		log.Printf("Failed to get object ETag: %v", err)
 		return "", err
