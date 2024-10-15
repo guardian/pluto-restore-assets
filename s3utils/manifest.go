@@ -15,6 +15,10 @@ import (
 )
 
 func GenerateCSVManifest(ctx context.Context, s3Client *s3.Client, bucket, prefix, filePath string) error {
+	if prefix == "" || prefix == "/" {
+		return fmt.Errorf("invalid prefix: prefix is empty")
+	}
+
 	log.Printf("Generating CSV manifest for bucket: %s, prefix: %s", bucket, prefix)
 
 	if filePath == "" {

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 	"time"
 
 	"github.com/google/uuid"
@@ -15,7 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3control/types"
 )
 
-func InitiateS3BatchRestore(ctx context.Context, s3Client s3control.Client, accountID, bucketName, manifestKey, manifestETag string) (string, error) {
+func InitiateS3BatchRestore(ctx context.Context, s3Client s3control.Client, accountID, bucketName, manifestKey, roleArn, manifestETag string) (string, error) {
 	log.Println("Initiating S3 Batch Operations job...")
 
 	clientRequestToken := uuid.New().String()
@@ -26,9 +25,7 @@ func InitiateS3BatchRestore(ctx context.Context, s3Client s3control.Client, acco
 	}
 
 	client := s3control.NewFromConfig(cfg)
-	// get roleArn from env
-	roleArn := os.Getenv("AWS_ROLE_ARN")
-	log.Println("roleArn", roleArn)
+	log.Printf("roleArn: %s", roleArn)
 
 	jobInput := &s3control.CreateJobInput{
 		AccountId: aws.String(accountID),
@@ -96,7 +93,9 @@ func InitiateS3BatchRestore(ctx context.Context, s3Client s3control.Client, acco
 }
 
 func waitForJobReadyToUpdate(client *s3control.Client, accountID, jobID string) error {
-	maxAttempts := 10
+	maxAttempts := 60 // Increase to 60 attempts
+	backoff := time.Second
+
 	for attempt := 0; attempt < maxAttempts; attempt++ {
 		describeInput := &s3control.DescribeJobInput{
 			AccountId: aws.String(accountID),
@@ -112,8 +111,14 @@ func waitForJobReadyToUpdate(client *s3control.Client, accountID, jobID string) 
 			return nil // Job is ready to be updated
 		}
 
-		log.Printf("Waiting for job to be ready for update. Current status: %s", describeOutput.Job.Status)
-		time.Sleep(1 * time.Second)
+		log.Printf("Waiting for job to be ready for update. Attempt %d/%d. Current status: %s",
+			attempt+1, maxAttempts, describeOutput.Job.Status)
+
+		time.Sleep(backoff)
+		backoff = time.Duration(float64(backoff) * 1.5) // Exponential backoff
+		if backoff > 30*time.Second {
+			backoff = 30 * time.Second // Cap at 30 seconds
+		}
 	}
 
 	return fmt.Errorf("job did not reach updateable state within expected time")

@@ -40,8 +40,14 @@ func NewJobCreator(namespace string) (*JobCreator, error) {
 }
 
 func (jc *JobCreator) CreateRestoreJob(params RestoreParams) error {
-	jobName := fmt.Sprintf("restore-job-%d", time.Now().Unix())
+	jobName := fmt.Sprintf("restore-job-%d-%d", params.ProjectId, time.Now().Unix())
 	log.Printf("Creating restore job: %s", jobName)
+
+	// Check if a job with this name already exists
+	_, err := jc.clientset.BatchV1().Jobs(jc.namespace).Get(context.Background(), jobName, metav1.GetOptions{})
+	if err == nil {
+		return fmt.Errorf("job %s already exists", jobName)
+	}
 
 	paramsJSON, err := json.Marshal(params)
 	if err != nil {
@@ -58,7 +64,7 @@ func (jc *JobCreator) CreateRestoreJob(params RestoreParams) error {
 					Containers: []corev1.Container{
 						{
 							Name:  "restore-worker",
-							Image: "your-restore-worker-image:latest",
+							Image: "guardianmultimedia/pluto-project-restore-worker:DEV", // Update this with your actual image
 							Env: []corev1.EnvVar{
 								{
 									Name:  "RESTORE_PARAMS",
