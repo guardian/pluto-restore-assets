@@ -14,6 +14,7 @@ import (
 type RequestBody struct {
 	ID   int    `json:"id"`
 	Path string `json:"path"`
+	User string `json:"user"`
 }
 
 type RestoreParams struct {
