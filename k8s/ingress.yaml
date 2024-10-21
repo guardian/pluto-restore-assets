@@ -22,7 +22,7 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: pluto-project-restore
+            name: pluto-restore-assets
             port:
               number: 9000
       - path: /vs/(.*)

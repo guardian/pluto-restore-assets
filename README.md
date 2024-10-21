@@ -1,4 +1,4 @@
-# Pluto Asset Restore
+# Pluto Restore Assets
 
 Summary of Costs for 1000 objects in Glacier totalling 1TB:
 

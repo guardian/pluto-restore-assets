@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"pluto-asset-restore/s3utils"
+	"pluto-restore-assets/s3utils"
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"

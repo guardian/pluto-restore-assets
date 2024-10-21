@@ -1,4 +1,4 @@
-module pluto-asset-restore
+module pluto-restore-assets
 
 go 1.23.1
 
