@@ -1,0 +1,76 @@
+name: Build and test pluto-restore-assets
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Ensure we only ever have one build running at a time.
+# If we push twice in quick succession, the first build will be stopped once the second starts.
+# This avoids any race conditions.
+concurrency:
+    group: ${{ github.ref }}
+    cancel-in-progress: true
+  
+jobs:
+  CI:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+      # These permissions are required by guardian/actions-riff-raff...
+      id-token: write # ...to exchange an OIDC JWT ID token for AWS credentials
+      pull-requests: write #...to comment on PRs
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.23.x
+
+      - name: Install dependencies
+        run: go mod download
+ 
+      - name: Test
+        run: go test ./...
+
+      - name: Build
+        run: go build -o pluto-restore-assets ./cmd/pluto-restore-assets/main.go
+
+      - name: Make GITHUB_RUN_NUMBER env var available outside of shells
+        working-directory: ${{env.GITHUB_WORKSPACE}}
+        shell: bash
+        run: echo "GITHUB_RUN_NUMBER=${GITHUB_RUN_NUMBER}" >> $GITHUB_ENV
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          role-session-name: GHA-build
+
+      - name: ECR Login
+        run: aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      
+      - name: Build Docker image pluto-restore-assets
+        run: docker build . -t "guardianmultimedia/pluto-restore-assets:${{ env.GITHUB_RUN_NUMBER }}"
+      - name: Build Docker image pluto-restore-assets-worker
+        run: docker build -f worker/Dockerfile -t guardianmultimedia/pluto-restore-assets-worker:${{ env.GITHUB_RUN_NUMBER }} .
+
+      - name: Tag Docker image pluto-restore-assets
+        run: docker tag guardianmultimedia/pluto-restore-assets:${{ env.GITHUB_RUN_NUMBER }} ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/pluto-restore-assets:${{ env.GITHUB_RUN_NUMBER }}
+
+      - name: Tag Docker image pluto-restore-assets-worker
+        run: docker tag guardianmultimedia/pluto-restore-assets-worker:${{ env.GITHUB_RUN_NUMBER }} ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/pluto-restore-assets-worker:${{ env.GITHUB_RUN_NUMBER }}
+      
+      - name: Push Docker image pluto-restore-assets
+        run: docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/pluto-restore-assets:${{ env.GITHUB_RUN_NUMBER }}
+
+      - name: Push Docker image pluto-restore-assets-worker
+        run: docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/pluto-restore-assets-worker:${{ env.GITHUB_RUN_NUMBER }}
