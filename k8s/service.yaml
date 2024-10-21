@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    service: pluto-project-restore
+    stack: prexit
+    stage: CODE
+  name: pluto-project-restore
+spec:
+  ports:
+    - name: '9000'
+      port: 9000
+      targetPort: 9000
+  selector:
+    service: pluto-project-restore
+    stack: prexit
+    stage: CODE

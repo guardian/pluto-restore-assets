@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    service: pluto-project-restore
+    stack: prexit
+    stage: CODE
+  name: pluto-project-restore
+spec:
+  replicas: 1
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      service: pluto-project-restore
+      stack: prexit
+      stage: CODE
+  template:
+    metadata:
+      labels:
+        log-format: django
+        service: pluto-project-restore
+        stack: prexit
+        stage: CODE
+    spec:
+      containers:
+        - image: guardianmultimedia/pluto-project-restore:DEV
+          imagePullPolicy: Never
+          name: project-restore
+          env:
+            - name: AWS_ACCESS_KEY_ID
+              value: <YOUR AWS ACCESS KEY ID>
+            - name: AWS_SECRET_ACCESS_KEY
+              value: <YOUR AWS SECRET ACCESS KEY>
+            - name: AWS_DEFAULT_REGION
+              value: eu-west-1
+            - name: AWS_ROLE_ARN
+              value: <YOUR AWS ROLE ARN>
+          ports:
+            - containerPort: 9000
+              name: restore
+        
+      

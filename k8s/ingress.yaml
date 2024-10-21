@@ -1,0 +1,97 @@
+# Add the /project-restore path to the ingress
+
+apiVersion: networking.k8s.io/v1 
+kind: Ingress
+metadata:
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.org/rewrites: serviceName=pluto-mediabrowser rewrite=/;serviceName=pluto-core rewrite=/;serviceName=pluto-logtool rewrite=/;serviceName=pluto-userbeacon rewrite=/;serviceName=pluto-deliverables rewrite=/;serviceName=messagequeue rewrite=/;serviceName=pluto-logtool rewrite=/;serviceName=deliverable-receiver rewrite=/;serviceName=versions rewrite=/;
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
+    nginx.ingress.kubernetes.io/proxy-body-size: 8m
+  name: pluto-ingress
+spec:
+  tls:
+    - hosts:
+        - prexit.local
+      secretName: prexit-local-certs
+  rules:
+  - host: prexit.local
+    http:
+      paths:
+      - path: /project-restore/(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: pluto-project-restore
+            port:
+              number: 9000
+      - path: /vs/(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: pluto-mediabrowser
+            port:
+              number: 80
+      - path: /pluto-core/(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: pluto-core
+            port:
+              number: 9000
+      - path: /deliverables/(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: pluto-deliverables
+            port:
+              number: 9000
+      - path: /userbeacon/(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: pluto-userbeacon
+            port:
+              number: 9000
+      - path: /rabbitmqadmin/(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: messagequeue
+            port:
+              number: 15672
+      - path: /vs-jobs/(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: pluto-logtool
+            port:
+              number: 80
+      - path: /deliverable-receiver/(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: deliverable-receiver
+            port:
+              number: 9000
+      - path: /cds/(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: cds-logviewer
+            port:
+              number: 9000
+      - path: /versions/(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: pluto-versions-manager
+            port:
+              number: 9000 
+      - path: /(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: pluto-start
+            port:
+             number: 80
