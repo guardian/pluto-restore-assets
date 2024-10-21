@@ -59,8 +59,9 @@ jobs:
         uses: docker/setup-buildx-action@v2
 
       - name: Build and tag Docker image pluto-restore-assets
+
         run: |
-          docker build --cache-from=type=registry,ref=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/pluto-restore-assets:latest . -t "guardianmultimedia/pluto-restore-assets:${{ env.GITHUB_RUN_NUMBER }}"
+          docker build --cache-from=type=registry,ref=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/pluto-restore-assets:${{ env.GITHUB_RUN_NUMBER }} . -t "guardianmultimedia/pluto-restore-assets:${{ env.GITHUB_RUN_NUMBER }}"
           docker tag guardianmultimedia/pluto-restore-assets:${{ env.GITHUB_RUN_NUMBER }} ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/pluto-restore-assets:${{ env.GITHUB_RUN_NUMBER }}
 
       - name: Push Docker image pluto-restore-assets
@@ -76,7 +77,7 @@ jobs:
 
       - name: Build and tag Docker image pluto-restore-assets-worker
         run: |
-          docker build -f worker/Dockerfile --cache-from=type=registry,ref=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/pluto-restore-assets-worker:latest . -t guardianmultimedia/pluto-restore-assets-worker:${{ env.GITHUB_RUN_NUMBER }}
+          docker build -f worker/Dockerfile --cache-from=type=registry,ref=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/pluto-restore-assets-worker:${{ env.GITHUB_RUN_NUMBER }} . -t guardianmultimedia/pluto-restore-assets-worker:${{ env.GITHUB_RUN_NUMBER }}
           docker tag guardianmultimedia/pluto-restore-assets-worker:${{ env.GITHUB_RUN_NUMBER }} ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/pluto-restore-assets-worker:${{ env.GITHUB_RUN_NUMBER }}
 
       - name: Push Docker image pluto-restore-assets-worker
