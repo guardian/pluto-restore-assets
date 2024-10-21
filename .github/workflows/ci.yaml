@@ -37,9 +37,6 @@ jobs:
       - name: Test
         run: go test ./...
 
-      - name: Build
-        run: go build -o pluto-restore-assets ./cmd/pluto-restore-assets/main.go
-
       - name: Make GITHUB_RUN_NUMBER env var available outside of shells
         working-directory: ${{env.GITHUB_WORKSPACE}}
         shell: bash
