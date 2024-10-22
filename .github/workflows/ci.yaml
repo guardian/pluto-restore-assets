@@ -54,8 +54,12 @@ jobs:
 
       - name: DEBUG
         run: |
-          echo "RUN_NUMBER=${{ needs.CI.outputs.run_number }}"
-          echo "AWS_REGION=${{ secrets.AWS_REGION }}"
+          if [[ -z "${{ secrets.AWS_REGION }}" ]]; then
+            echo "AWS_REGION is not set"
+            exit 1
+          else
+            echo "AWS_REGION is set"
+          fi
       - name: Checkout
         uses: actions/checkout@v4
 
