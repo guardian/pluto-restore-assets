@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -64,7 +65,7 @@ func (jc *JobCreator) CreateRestoreJob(params RestoreParams) error {
 					Containers: []corev1.Container{
 						{
 							Name:  "restore-worker",
-							Image: "guardianmultimedia/pluto-project-restore-worker:DEV", // Update this with your actual image
+							Image: os.Getenv("WORKER_IMAGE"),
 							Env: []corev1.EnvVar{
 								{
 									Name:  "RESTORE_PARAMS",
