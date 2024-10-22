@@ -52,6 +52,10 @@ jobs:
     needs: CI
     steps:
 
+      - name: DEBUG
+        run: |
+          echo "RUN_NUMBER=${{ needs.CI.outputs.run_number }}"
+          echo "AWS_REGION=${{ secrets.AWS_REGION }}"
       - name: Checkout
         uses: actions/checkout@v4
 
