@@ -4,7 +4,7 @@
 build-local:
 	eval $$(minikube -p minikube docker-env | source)
 	docker build . -t guardianmultimedia/pluto-restore-assets:DEV
-	docker build -f worker/Dockerfile -t guardianmultimedia/pluto-project-restore-worker:DEV .
+	docker build -f worker/Dockerfile -t guardianmultimedia/pluto-restore-assets-worker:DEV .
 
 .PHONY: deploy-local
 deploy-local:
