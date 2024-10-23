@@ -27,6 +27,14 @@ spec:
           imagePullPolicy: Never
           name: project-restore
           env:
+            - name: KUBE_NAMESPACE
+              value: default # change to pluto-ng / pluto-ng-dev
+            - name: ASSET_BUCKET_LIST
+              value: "test-bucket" # comma separated list of buckets
+            - name: MANIFEST_BUCKET
+              value: "test-bucket"
+            - name: WORKER_IMAGE
+              value: worker-image
             - name: AWS_ACCESS_KEY_ID
               value: <YOUR AWS ACCESS KEY ID>
             - name: AWS_SECRET_ACCESS_KEY
