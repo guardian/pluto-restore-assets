@@ -2,6 +2,7 @@ package s3utils
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -9,9 +10,10 @@ import (
 	restoreTypes "pluto-restore-assets/types"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3control"
 	"github.com/aws/aws-sdk-go-v2/service/s3control/types"
+	"github.com/aws/smithy-go"
 )
 
 // func InitiateS3BatchRestore(ctx context.Context, s3Client s3control.Client, accountID, bucketName, manifestKey, roleArn, manifestETag string) (string, error) {
@@ -19,13 +21,11 @@ import (
 func InitiateS3BatchRestore(ctx context.Context, s3Client *s3.Client, s3ControlClient s3control.Client, accountID string, params restoreTypes.RestoreParams, manifestETag string) (string, error) {
 	log.Println("Initiating S3 Batch Operations job...")
 
-	cfg, err := config.LoadDefaultConfig(context.TODO())
+	// Get the current ETag of the manifest file
+	currentETag, err := getCurrentETag(ctx, s3Client, params.ManifestBucket, params.ManifestKey)
 	if err != nil {
-		return "", fmt.Errorf("failed to load AWS config: %w", err)
+		return "", fmt.Errorf("failed to get current ETag: %w", err)
 	}
-
-	client := s3control.NewFromConfig(cfg)
-	log.Printf("roleArn: %s", roleArn)
 
 	jobInput := &s3control.CreateJobInput{
 		AccountId: aws.String(accountID),
@@ -51,27 +51,43 @@ func InitiateS3BatchRestore(ctx context.Context, s3Client *s3.Client, s3ControlC
 		Priority: aws.Int32(10),
 		Report: &types.JobReport{
 			Enabled:     true,
-			Bucket:      aws.String(fmt.Sprintf("arn:aws:s3:::%s", bucketName)),
+			Bucket:      aws.String(fmt.Sprintf("arn:aws:s3:::%s", params.ManifestBucket)),
 			Prefix:      aws.String("batch-job-reports/"),
 			Format:      types.JobReportFormatReportCsv20180820,
 			ReportScope: types.JobReportScopeAllTasks,
 		},
-		RoleArn: aws.String(roleArn),
-
-		ClientRequestToken: aws.String(clientRequestToken),
+		RoleArn: aws.String(params.RoleArn),
 	}
 
-	result, err := client.CreateJob(context.TODO(), jobInput)
+	result, err := s3ControlClient.CreateJob(context.TODO(), jobInput)
 	if err != nil {
-		return "", fmt.Errorf("failed to create S3 Batch Operations job: %w", err)
+		var ae smithy.APIError
+		if errors.As(err, &ae) {
+			if ae.ErrorCode() == "InvalidManifest" {
+				log.Printf("ETag mismatch detected. Attempting to retrieve current ETag.")
+				currentETag, err := getCurrentETag(ctx, s3Client, params.ManifestBucket, params.ManifestKey)
+				if err != nil {
+					return "", fmt.Errorf("failed to get current ETag: %w", err)
+				}
+				jobInput.Manifest.Location.ETag = aws.String(currentETag)
+				result, err = s3ControlClient.CreateJob(context.TODO(), jobInput)
+				if err != nil {
+					return "", fmt.Errorf("failed to create S3 Batch Operations job with updated ETag: %w", err)
+				}
+			} else {
+				return "", fmt.Errorf("failed to create S3 Batch Operations job: %w", err)
+			}
+		} else {
+			return "", fmt.Errorf("failed to create S3 Batch Operations job: %w", err)
+		}
 	}
 
 	jobID := aws.ToString(result.JobId)
 	log.Printf("S3 Batch Operations job created. Job ID: %s", jobID)
-
 	// Wait for the job to be in a state where we can update it
-	err = waitForJobReadyToUpdate(client, accountID, jobID)
+	err = waitForJobReadyToUpdate(&s3ControlClient, accountID, jobID)
 	if err != nil {
+		log.Printf("Failed to wait for job to be ready: %v", err)
 		return "", fmt.Errorf("failed to wait for job to be ready: %w", err)
 	}
 
@@ -82,8 +98,9 @@ func InitiateS3BatchRestore(ctx context.Context, s3Client *s3.Client, s3ControlC
 		RequestedJobStatus: types.RequestedJobStatusReady,
 	}
 
-	_, err = client.UpdateJobStatus(context.TODO(), updateInput)
+	_, err = s3ControlClient.UpdateJobStatus(context.TODO(), updateInput)
 	if err != nil {
+		log.Printf("Failed to start S3 Batch Operations job: %v", err)
 		return "", fmt.Errorf("failed to start S3 Batch Operations job: %w", err)
 	}
 
@@ -93,7 +110,7 @@ func InitiateS3BatchRestore(ctx context.Context, s3Client *s3.Client, s3ControlC
 }
 
 func waitForJobReadyToUpdate(client *s3control.Client, accountID, jobID string) error {
-	maxAttempts := 60 // Increase to 60 attempts
+	maxAttempts := 60
 	backoff := time.Second
 
 	for attempt := 0; attempt < maxAttempts; attempt++ {
@@ -104,11 +121,24 @@ func waitForJobReadyToUpdate(client *s3control.Client, accountID, jobID string) 
 
 		describeOutput, err := client.DescribeJob(context.TODO(), describeInput)
 		if err != nil {
+			log.Printf("Failed to describe job: %v", err)
 			return fmt.Errorf("failed to describe job: %w", err)
+		}
+
+		log.Printf("Job status: %s, Progress: %+v", describeOutput.Job.Status, describeOutput.Job.ProgressSummary)
+
+		if len(describeOutput.Job.FailureReasons) > 0 {
+			for i, reason := range describeOutput.Job.FailureReasons {
+				log.Printf("Failure Reason %d - Code: %s, Reason: %s", i+1, aws.ToString(reason.FailureCode), aws.ToString(reason.FailureReason))
+			}
 		}
 
 		if describeOutput.Job.Status == types.JobStatusSuspended {
 			return nil // Job is ready to be updated
+		}
+
+		if describeOutput.Job.Status == types.JobStatusFailed {
+			return fmt.Errorf("job failed: %v", describeOutput.Job.FailureReasons)
 		}
 
 		log.Printf("Waiting for job to be ready for update. Attempt %d/%d. Current status: %s",
@@ -122,4 +152,15 @@ func waitForJobReadyToUpdate(client *s3control.Client, accountID, jobID string) 
 	}
 
 	return fmt.Errorf("job did not reach updateable state within expected time")
+}
+
+func getCurrentETag(ctx context.Context, s3Client *s3.Client, bucket, key string) (string, error) {
+	headOutput, err := s3Client.HeadObject(ctx, &s3.HeadObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to get object metadata: %w", err)
+	}
+	return *headOutput.ETag, nil
 }

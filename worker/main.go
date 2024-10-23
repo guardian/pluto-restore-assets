@@ -75,21 +75,22 @@ func initiateRestore(ctx context.Context, s3Client *s3.Client, s3ControlClient *
 		return "", err
 	}
 
-	jobID, err := s3utils.InitiateS3BatchRestore(ctx, *s3ControlClient, accountID, params.BucketName, params.ManifestKey, params.RoleArn, manifestETag)
+	jobID, err := s3utils.InitiateS3BatchRestore(ctx, s3Client, *s3ControlClient, accountID, params, manifestETag)
 	if err != nil {
+		log.Printf("Failed to initiate S3 Batch Restore: %v", err)
 		return "", fmt.Errorf("initiate S3 Batch Restore: %w", err)
 	}
 
 	return jobID, nil
 }
 
-func getRestoreDetails(ctx context.Context, s3Client *s3.Client, params RestoreParams) (string, string, error) {
+func getRestoreDetails(ctx context.Context, s3Client *s3.Client, params types.RestoreParams) (string, string, error) {
 	accountID, err := s3utils.GetAWSAccountID()
 	if err != nil {
 		return "", "", fmt.Errorf("get AWS Account ID: %w", err)
 	}
 
-	manifestETag, err := s3utils.GetObjectETag(ctx, s3Client, accountID, params.BucketName, params.ManifestKey)
+	manifestETag, err := s3utils.GetObjectETag(ctx, s3Client, accountID, params)
 	if err != nil {
 		return "", "", fmt.Errorf("get manifest ETag: %w", err)
 	}
