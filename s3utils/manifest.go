@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	restoreTypes "pluto-restore-assets/types"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -14,14 +15,16 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
-func GenerateCSVManifest(ctx context.Context, s3Client *s3.Client, bucket, prefix, filePath string) error {
-	if prefix == "" || prefix == "/" {
+// func GenerateCSVManifest(ctx context.Context, s3Client *s3.Client, bucket, prefix, filePath string) error {
+
+func GenerateCSVManifest(ctx context.Context, s3Client *s3.Client, params restoreTypes.RestoreParams) error {
+	if params.RestorePath == "" || params.RestorePath == "/" {
 		return fmt.Errorf("invalid prefix: prefix is empty")
 	}
 
-	log.Printf("Generating CSV manifest for bucket: %s, prefix: %s", bucket, prefix)
+	log.Printf("Generating CSV manifest for bucket: %s, prefix: %s", params.AssetBucketList[0], params.RestorePath)
 
-	if filePath == "" {
+	if params.ManifestLocalPath == "" {
 		return fmt.Errorf("invalid file path: file path is empty")
 	}
 
@@ -33,13 +36,13 @@ func GenerateCSVManifest(ctx context.Context, s3Client *s3.Client, bucket, prefi
 	client := s3.NewFromConfig(cfg)
 
 	paginator := s3.NewListObjectsV2Paginator(client, &s3.ListObjectsV2Input{
-		Bucket: aws.String(bucket),
-		Prefix: aws.String(prefix),
+		Bucket: aws.String(params.AssetBucketList[0]),
+		Prefix: aws.String(params.RestorePath),
 	})
 
-	file, err := os.Create(filePath)
+	file, err := os.Create(params.ManifestLocalPath)
 	if err != nil {
-		return fmt.Errorf("failed to create CSV file '%s': %w", filePath, err)
+		return fmt.Errorf("failed to create CSV file '%s': %w", params.ManifestLocalPath, err)
 	}
 	defer file.Close()
 
@@ -60,7 +63,7 @@ func GenerateCSVManifest(ctx context.Context, s3Client *s3.Client, bucket, prefi
 
 			// Check if the object is in Glacier or Deep Archive
 			if object.StorageClass == types.ObjectStorageClassGlacier || object.StorageClass == types.ObjectStorageClassDeepArchive {
-				err := writer.Write([]string{bucket, *object.Key})
+				err := writer.Write([]string{params.AssetBucketList[0], *object.Key})
 				if err != nil {
 					log.Printf("Failed to write object %s to CSV: %v", *object.Key, err)
 					continue
@@ -77,6 +80,6 @@ func GenerateCSVManifest(ctx context.Context, s3Client *s3.Client, bucket, prefi
 		return fmt.Errorf("failed to flush CSV writer: %w", err)
 	}
 
-	log.Printf("CSV manifest created at %s", filePath)
+	log.Printf("CSV manifest created at %s", params.ManifestLocalPath)
 	return nil
 }

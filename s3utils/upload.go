@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"os"
+	restoreTypes "pluto-restore-assets/types"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -17,7 +18,7 @@ import (
 func UploadFileToS3(ctx context.Context, s3Client *s3.Client, bucket, key, filePath string) (*s3.PutObjectOutput, error) {
 	log.Printf("Uploading file to S3: s3://%s/%s", bucket, key)
 
-	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("eu-west-1"))
+	cfg, err := config.LoadDefaultConfig(context.TODO())
 	if err != nil {
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}
@@ -58,11 +59,11 @@ func UploadFileToS3(ctx context.Context, s3Client *s3.Client, bucket, key, fileP
 	return result, nil
 }
 
-func GetObjectETag(ctx context.Context, s3Client *s3.Client, accountID, bucketName, key string) (string, error) {
+func GetObjectETag(ctx context.Context, s3Client *s3.Client, accountID string, params restoreTypes.RestoreParams) (string, error) {
 
 	input := &s3.HeadObjectInput{
-		Bucket: aws.String(bucketName),
-		Key:    aws.String(key),
+		Bucket: aws.String(params.AssetBucketList[0]),
+		Key:    aws.String(params.RestorePath),
 	}
 
 	result, err := s3Client.HeadObject(ctx, input)

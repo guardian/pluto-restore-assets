@@ -7,29 +7,18 @@ import (
 	"log"
 	"os"
 	"pluto-restore-assets/s3utils"
+	types "pluto-restore-assets/types"
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3control"
 )
 
-type RestoreParams struct {
-	BucketName            string
-	ManifestKey           string
-	ManifestLocalPath     string
-	AWS_ACCESS_KEY_ID     string
-	AWS_SECRET_ACCESS_KEY string
-	AWS_DEFAULT_REGION    string
-	ProjectId             int
-	RestorePath           string
-	RoleArn               string
-}
-
 func main() {
 	log.Println("Starting restore worker")
 
 	paramsJSON := os.Getenv("RESTORE_PARAMS")
-	var params RestoreParams
+	var params types.RestoreParams
 	if err := json.Unmarshal([]byte(paramsJSON), &params); err != nil {
 		log.Fatalf("Failed to unmarshal restore params: %v", err)
 	}
@@ -53,10 +42,10 @@ func main() {
 	log.Println("Restore worker completed successfully")
 }
 
-func handleRestore(ctx context.Context, s3Client *s3.Client, s3ControlClient *s3control.Client, params RestoreParams) error {
+func handleRestore(ctx context.Context, s3Client *s3.Client, s3ControlClient *s3control.Client, params types.RestoreParams) error {
 	log.Println("handleRestore function called")
 
-	if err := s3utils.GenerateCSVManifest(ctx, s3Client, params.BucketName, params.RestorePath, params.ManifestLocalPath); err != nil {
+	if err := s3utils.GenerateCSVManifest(ctx, s3Client, params); err != nil {
 		return fmt.Errorf("generate CSV manifest: %w", err)
 	}
 
@@ -76,8 +65,8 @@ func handleRestore(ctx context.Context, s3Client *s3.Client, s3ControlClient *s3
 	log.Println("Restore process completed")
 	return nil
 }
-func initiateRestore(ctx context.Context, s3Client *s3.Client, s3ControlClient *s3control.Client, params RestoreParams) (string, error) {
-	if _, err := s3utils.UploadFileToS3(ctx, s3Client, params.BucketName, params.ManifestKey, params.ManifestLocalPath); err != nil {
+func initiateRestore(ctx context.Context, s3Client *s3.Client, s3ControlClient *s3control.Client, params types.RestoreParams) (string, error) {
+	if _, err := s3utils.UploadFileToS3(ctx, s3Client, params.ManifestBucket, params.ManifestKey, params.ManifestLocalPath); err != nil {
 		return "", fmt.Errorf("upload manifest: %w", err)
 	}
 

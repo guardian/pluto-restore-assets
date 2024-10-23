@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	types "pluto-restore-assets/types"
 	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -40,7 +41,7 @@ func NewJobCreator(namespace string) (*JobCreator, error) {
 	}, nil
 }
 
-func (jc *JobCreator) CreateRestoreJob(params RestoreParams) error {
+func (jc *JobCreator) CreateRestoreJob(params types.RestoreParams) error {
 	jobName := fmt.Sprintf("restore-job-%d-%d", params.ProjectId, time.Now().Unix())
 	log.Printf("Creating restore job: %s", jobName)
 

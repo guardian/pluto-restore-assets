@@ -6,7 +6,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/google/uuid"
+	restoreTypes "pluto-restore-assets/types"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -14,10 +14,10 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3control/types"
 )
 
-func InitiateS3BatchRestore(ctx context.Context, s3Client s3control.Client, accountID, bucketName, manifestKey, roleArn, manifestETag string) (string, error) {
-	log.Println("Initiating S3 Batch Operations job...")
+// func InitiateS3BatchRestore(ctx context.Context, s3Client s3control.Client, accountID, bucketName, manifestKey, roleArn, manifestETag string) (string, error) {
 
-	clientRequestToken := uuid.New().String()
+func InitiateS3BatchRestore(ctx context.Context, s3Client *s3.Client, s3ControlClient s3control.Client, accountID string, params restoreTypes.RestoreParams, manifestETag string) (string, error) {
+	log.Println("Initiating S3 Batch Operations job...")
 
 	cfg, err := config.LoadDefaultConfig(context.TODO())
 	if err != nil {
@@ -38,8 +38,8 @@ func InitiateS3BatchRestore(ctx context.Context, s3Client s3control.Client, acco
 				},
 			},
 			Location: &types.JobManifestLocation{
-				ObjectArn: aws.String(fmt.Sprintf("arn:aws:s3:::%s/%s", bucketName, manifestKey)),
-				ETag:      aws.String(manifestETag),
+				ObjectArn: aws.String(fmt.Sprintf("arn:aws:s3:::%s/%s", params.ManifestBucket, params.ManifestKey)),
+				ETag:      aws.String(currentETag),
 			},
 		},
 		Operation: &types.JobOperation{
