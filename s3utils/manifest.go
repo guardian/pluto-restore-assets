@@ -7,17 +7,14 @@ import (
 	"log"
 	"os"
 	restoreTypes "pluto-restore-assets/types"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
 // func GenerateCSVManifest(ctx context.Context, s3Client *s3.Client, bucket, prefix, filePath string) error {
 
-func GenerateCSVManifest(ctx context.Context, s3Client *s3.Client, params restoreTypes.RestoreParams) error {
+func GenerateCSVManifest(ctx context.Context, s3Client S3ClientInterface, params restoreTypes.RestoreParams) error {
 	if params.RestorePath == "" || params.RestorePath == "/" {
 		return fmt.Errorf("invalid prefix: prefix is empty")
 	}
@@ -28,58 +25,35 @@ func GenerateCSVManifest(ctx context.Context, s3Client *s3.Client, params restor
 		return fmt.Errorf("invalid file path: file path is empty")
 	}
 
-	cfg, err := config.LoadDefaultConfig(context.TODO())
-	if err != nil {
-		return fmt.Errorf("failed to load AWS config: %w", err)
-	}
-
-	client := s3.NewFromConfig(cfg)
-
-	paginator := s3.NewListObjectsV2Paginator(client, &s3.ListObjectsV2Input{
-		Bucket: aws.String(params.AssetBucketList[0]),
-		Prefix: aws.String(params.RestorePath),
-	})
-
 	file, err := os.Create(params.ManifestLocalPath)
 	if err != nil {
-		return fmt.Errorf("failed to create CSV file '%s': %w", params.ManifestLocalPath, err)
+		return fmt.Errorf("failed to create manifest file: %w", err)
 	}
 	defer file.Close()
 
 	writer := csv.NewWriter(file)
 	defer writer.Flush()
 
+	input := &s3.ListObjectsV2Input{
+		Bucket: aws.String(params.AssetBucketList[0]),
+		Prefix: aws.String(params.RestorePath),
+	}
+
+	paginator := s3.NewListObjectsV2Paginator(s3Client, input)
+
 	for paginator.HasMorePages() {
-		page, err := paginator.NextPage(context.TODO())
+		output, err := paginator.NextPage(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to list objects: %w", err)
 		}
 
-		for _, object := range page.Contents {
-			// Skip directories
-			if *object.Size == 0 && strings.HasSuffix(*object.Key, "/") {
-				continue
-			}
-
-			// Check if the object is in Glacier or Deep Archive
-			if object.StorageClass == types.ObjectStorageClassGlacier || object.StorageClass == types.ObjectStorageClassDeepArchive {
-				err := writer.Write([]string{params.AssetBucketList[0], *object.Key})
-				if err != nil {
-					log.Printf("Failed to write object %s to CSV: %v", *object.Key, err)
-					continue
-				}
-				log.Printf("Added object to manifest: %s", *object.Key)
-			} else {
-				log.Printf("Skipping object not in Glacier or Deep Archive: %s", *object.Key)
+		for _, obj := range output.Contents {
+			err := writer.Write([]string{params.AssetBucketList[0], *obj.Key})
+			if err != nil {
+				return fmt.Errorf("failed to write to CSV: %w", err)
 			}
 		}
 	}
 
-	writer.Flush()
-	if err := writer.Error(); err != nil {
-		return fmt.Errorf("failed to flush CSV writer: %w", err)
-	}
-
-	log.Printf("CSV manifest created at %s", params.ManifestLocalPath)
 	return nil
 }
