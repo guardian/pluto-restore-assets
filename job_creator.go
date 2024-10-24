@@ -76,6 +76,11 @@ func (jc *JobCreator) CreateRestoreJob(params types.RestoreParams) error {
 						},
 					},
 					RestartPolicy: corev1.RestartPolicyNever,
+					ImagePullSecrets: []corev1.LocalObjectReference{
+						{
+							Name: "aws-registry",
+						},
+					},
 				},
 			},
 		},
