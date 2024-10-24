@@ -11,10 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-type S3ClientInterface interface {
-	// Define your S3 client methods here
-}
-
 func (m *MockS3Client) Client() *s3.Client {
 	return &s3.Client{}
 }

@@ -20,6 +20,8 @@ func MonitorObjectRestoreStatus(ctx context.Context, client *s3.Client) error {
 	if err != nil {
 		return fmt.Errorf("failed to read manifest file: %v", err)
 	}
+	// Remove keys that are directories and have the "/" suffix
+	keys = removeDirectories(keys)
 
 	log.Printf("Monitoring %d objects", len(keys))
 	remainingKeys := keys
@@ -50,6 +52,7 @@ func MonitorObjectRestoreStatus(ctx context.Context, client *s3.Client) error {
 		remainingKeys = stillRestoring
 		sleepDuration := time.Duration(15+rand.Intn(30)) * time.Minute
 		log.Printf("%d objects still restoring. Waiting %v before next check...", len(remainingKeys), sleepDuration)
+		log.Printf("Remaining keys: %v", remainingKeys)
 		time.Sleep(sleepDuration)
 	}
 	return nil
@@ -72,6 +75,17 @@ type S3Entry struct {
 	Key    string
 }
 
+func removeDirectories(keys []S3Entry) []S3Entry {
+	var filteredKeys []S3Entry
+	for _, key := range keys {
+		if strings.HasSuffix(key.Key, "/") {
+			log.Printf("Ignoring directory %s/%s", key.Bucket, key.Key)
+		} else {
+			filteredKeys = append(filteredKeys, key)
+		}
+	}
+	return filteredKeys
+}
 func readManifestFile(filepath string) ([]S3Entry, error) {
 	file, err := os.Open(filepath)
 	if err != nil {
