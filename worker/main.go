@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3control"
+	"github.com/aws/aws-sdk-go/aws"
 )
 
 func main() {
@@ -90,10 +91,22 @@ func getRestoreDetails(ctx context.Context, s3Client *s3.Client, params types.Re
 		return "", "", fmt.Errorf("get AWS Account ID: %w", err)
 	}
 
+	log.Printf("Attempting to get ETag for manifest: s3://%s/%s", params.ManifestBucket, params.ManifestKey)
 	manifestETag, err := s3utils.GetObjectETag(ctx, s3Client, accountID, params)
 	if err != nil {
+		log.Printf("Error getting manifest ETag: %v", err)
+		// Check if the file exists
+		_, err := s3Client.HeadObject(ctx, &s3.HeadObjectInput{
+			Bucket: aws.String(params.ManifestBucket),
+			Key:    aws.String(params.ManifestKey),
+		})
+		if err != nil {
+			log.Printf("Error checking if manifest file exists: %v", err)
+			return "", "", fmt.Errorf("manifest file does not exist or is not accessible: %w", err)
+		}
 		return "", "", fmt.Errorf("get manifest ETag: %w", err)
 	}
 
+	log.Printf("Successfully retrieved ETag for manifest: %s", manifestETag)
 	return accountID, manifestETag, nil
 }
