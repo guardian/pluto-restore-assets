@@ -8,11 +8,13 @@ import (
 	"os"
 	"pluto-restore-assets/s3utils"
 	types "pluto-restore-assets/types"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3control"
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/cenkalti/backoff/v4"
 )
 
 func main() {
@@ -92,9 +94,22 @@ func getRestoreDetails(ctx context.Context, s3Client *s3.Client, params types.Re
 	}
 
 	log.Printf("Attempting to get ETag for manifest: s3://%s/%s", params.ManifestBucket, params.ManifestKey)
-	manifestETag, err := s3utils.GetObjectETag(ctx, s3Client, accountID, params)
-	if err != nil {
-		log.Printf("Error getting manifest ETag: %v", err)
+	var manifestETag string
+	retryOperation := func() error {
+		var err error
+		manifestETag, err = s3utils.GetObjectETag(ctx, s3Client, params)
+		if err != nil {
+			log.Printf("Error getting manifest ETag (will retry): %v", err)
+			return err
+		}
+		return nil
+	}
+
+	backOff := backoff.NewExponentialBackOff()
+	backOff.MaxElapsedTime = 1 * time.Minute
+
+	if err := backoff.Retry(retryOperation, backOff); err != nil {
+		log.Printf("Failed to get manifest ETag after retries: %v", err)
 		// Check if the file exists
 		_, err := s3Client.HeadObject(ctx, &s3.HeadObjectInput{
 			Bucket: aws.String(params.ManifestBucket),

@@ -8,7 +8,7 @@ import (
 	"io"
 	"log"
 	"os"
-	restoreTypes "pluto-restore-assets/types"
+	"pluto-restore-assets/types"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -59,18 +59,16 @@ func UploadFileToS3(ctx context.Context, s3Client *s3.Client, bucket, key, fileP
 	return result, nil
 }
 
-func GetObjectETag(ctx context.Context, s3Client *s3.Client, accountID string, params restoreTypes.RestoreParams) (string, error) {
-
-	input := &s3.HeadObjectInput{
-		Bucket: aws.String(params.AssetBucketList[0]),
-		Key:    aws.String(params.RestorePath),
-	}
-
-	result, err := s3Client.HeadObject(ctx, input)
+func GetObjectETag(ctx context.Context, s3Client *s3.Client, params types.RestoreParams) (string, error) {
+	headOutput, err := s3Client.HeadObject(ctx, &s3.HeadObjectInput{
+		Bucket: aws.String(params.ManifestBucket),
+		Key:    aws.String(params.ManifestKey),
+	})
 	if err != nil {
-		log.Printf("Failed to get object ETag: %v", err)
-		return "", err
+		return "", fmt.Errorf("failed to get object metadata: %w", err)
 	}
-
-	return *result.ETag, nil
+	if headOutput.ETag == nil {
+		return "", fmt.Errorf("ETag is nil")
+	}
+	return *headOutput.ETag, nil
 }
