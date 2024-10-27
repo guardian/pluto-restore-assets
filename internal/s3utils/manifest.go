@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
-	restoreTypes "pluto-restore-assets/types"
+	restoreTypes "pluto-restore-assets/internal/types"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"

@@ -6,14 +6,14 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"pluto-restore-assets/s3utils"
-	types "pluto-restore-assets/types"
+	"pluto-restore-assets/internal/s3utils"
+	types "pluto-restore-assets/internal/types"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3control"
-	"github.com/aws/aws-sdk-go/aws"
 	"github.com/cenkalti/backoff/v4"
 )
 
@@ -61,8 +61,12 @@ func handleRestore(ctx context.Context, s3Client *s3.Client, s3ControlClient *s3
 
 	log.Printf("S3 Batch Restore initiated with job ID: %s", jobID)
 
-	if err := s3utils.MonitorObjectRestoreStatus(ctx, s3Client); err != nil {
+	if keys, err := s3utils.MonitorObjectRestoreStatus(ctx, s3Client); err != nil {
 		return fmt.Errorf("monitor restore: %w", err)
+	} else {
+		if err := s3utils.DownloadFiles(ctx, s3Client, keys, params.BasePath); err != nil {
+			return fmt.Errorf("download files: %w", err)
+		}
 	}
 
 	log.Println("Restore process completed")

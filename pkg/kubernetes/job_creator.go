@@ -1,4 +1,4 @@
-package main
+package kubernetes
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
-	types "pluto-restore-assets/types"
+	types "pluto-restore-assets/internal/types"
 	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -102,4 +102,26 @@ func (jc *JobCreator) CreateRestoreJob(params types.RestoreParams) error {
 	log.Printf("Job Status: %+v", createdJob.Status)
 
 	return nil
+}
+
+func (jc *JobCreator) GetJobLogs(jobName string) (string, error) {
+	// Get pods associated with the job
+	pods, err := jc.clientset.CoreV1().Pods(jc.namespace).List(context.Background(), metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("job-name=%s", jobName),
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to list pods: %w", err)
+	}
+
+	if len(pods.Items) == 0 {
+		return "", fmt.Errorf("no pods found for job %s", jobName)
+	}
+
+	// Get logs from the first pod
+	podLogs, err := jc.clientset.CoreV1().Pods(jc.namespace).GetLogs(pods.Items[0].Name, &corev1.PodLogOptions{}).Do(context.Background()).Raw()
+	if err != nil {
+		return "", fmt.Errorf("failed to get pod logs: %w", err)
+	}
+
+	return string(podLogs), nil
 }

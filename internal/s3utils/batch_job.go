@@ -7,7 +7,7 @@ import (
 	"log"
 	"time"
 
-	restoreTypes "pluto-restore-assets/types"
+	restoreTypes "pluto-restore-assets/internal/types"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -15,8 +15,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3control/types"
 	"github.com/aws/smithy-go"
 )
-
-// func InitiateS3BatchRestore(ctx context.Context, s3Client s3control.Client, accountID, bucketName, manifestKey, roleArn, manifestETag string) (string, error) {
 
 func InitiateS3BatchRestore(ctx context.Context, s3Client *s3.Client, s3ControlClient s3control.Client, accountID string, params restoreTypes.RestoreParams, manifestETag string) (string, error) {
 	log.Println("Initiating S3 Batch Operations job...")

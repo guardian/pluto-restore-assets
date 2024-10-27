@@ -15,10 +15,10 @@ import (
 	"github.com/cenkalti/backoff/v4"
 )
 
-func MonitorObjectRestoreStatus(ctx context.Context, client *s3.Client) error {
+func MonitorObjectRestoreStatus(ctx context.Context, client *s3.Client) ([]S3Entry, error) {
 	keys, err := readManifestFile("/tmp/manifest.csv")
 	if err != nil {
-		return fmt.Errorf("failed to read manifest file: %v", err)
+		return nil, fmt.Errorf("failed to read manifest file: %v", err)
 	}
 	// Remove keys that are directories and have the "/" suffix
 	keys = removeDirectories(keys)
@@ -43,10 +43,7 @@ func MonitorObjectRestoreStatus(ctx context.Context, client *s3.Client) error {
 
 		if len(stillRestoring) == 0 {
 			log.Println("All objects restored successfully")
-			if err := DownloadFiles(ctx, client, keys); err != nil {
-				return fmt.Errorf("failed to download files: %w", err)
-			}
-			return nil
+			return keys, nil
 		}
 
 		remainingKeys = stillRestoring
@@ -55,19 +52,7 @@ func MonitorObjectRestoreStatus(ctx context.Context, client *s3.Client) error {
 		log.Printf("Remaining keys: %v", remainingKeys)
 		time.Sleep(sleepDuration)
 	}
-	return nil
-}
-
-func DownloadFiles(ctx context.Context, client *s3.Client, keys []S3Entry) error {
-	log.Printf("Downloading %d files", len(keys))
-	log.Printf("Files: %v", keys)
-	// for _, key := range keys {
-	// 	downloadPath := fmt.Sprintf("/tmp/%s", key.Key)
-	// 	err := downloadFile(ctx, client, key.Bucket, key.Key, downloadPath)
-	// 	if err != nil {
-	// 		return fmt.Errorf("failed to download file %s/%s: %w", key.Bucket, key.Key, err)
-	// 	}
-	return nil
+	return nil, nil
 }
 
 type S3Entry struct {

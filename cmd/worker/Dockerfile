@@ -5,11 +5,12 @@ FROM golang:1.23 AS builder
 
 WORKDIR /app
 
-COPY .. .
-
+COPY go.mod go.sum ./
 RUN go mod download
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o restore-worker ./worker
+COPY . .
+
+RUN CGO_ENABLED=0 GOOS=linux go build -o restore-worker ./cmd/worker
 
 FROM alpine:latest
 

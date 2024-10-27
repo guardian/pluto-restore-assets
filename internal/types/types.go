@@ -12,6 +12,7 @@ type RestoreParams struct {
 	ProjectId             int      `json:"projectId"`
 	User                  string   `json:"user"`
 	RestorePath           string   `json:"restorePath"`
+	BasePath              string   `json:"basePath"`
 }
 
 type RequestBody struct {
