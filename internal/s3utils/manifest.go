@@ -19,12 +19,49 @@ func GenerateCSVManifest(ctx context.Context, s3Client S3ClientInterface, params
 		return fmt.Errorf("invalid prefix: prefix is empty")
 	}
 
-	log.Printf("Generating CSV manifest for bucket: %s, prefix: %s", params.AssetBucketList[0], params.RestorePath)
+	if len(params.AssetBucketList) == 0 {
+		return fmt.Errorf("no asset buckets provided")
+	}
 
 	if params.ManifestLocalPath == "" {
 		return fmt.Errorf("invalid file path: file path is empty")
 	}
 
+	// Create a map to track unique keys and their source buckets
+	uniqueKeys := make(map[string]string) // key -> bucket
+
+	// Check each bucket for the path and collect objects
+	for _, bucket := range params.AssetBucketList {
+		log.Printf("Checking bucket: %s for prefix: %s", bucket, params.RestorePath)
+
+		input := &s3.ListObjectsV2Input{
+			Bucket: aws.String(bucket),
+			Prefix: aws.String(params.RestorePath),
+		}
+
+		paginator := s3.NewListObjectsV2Paginator(s3Client, input)
+
+		for paginator.HasMorePages() {
+			output, err := paginator.NextPage(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to list objects in bucket %s: %w", bucket, err)
+			}
+
+			// If we found objects, add them to our map
+			// First bucket's objects take precedence due to map overwrite behavior
+			for _, obj := range output.Contents {
+				if _, exists := uniqueKeys[*obj.Key]; !exists {
+					uniqueKeys[*obj.Key] = bucket
+				}
+			}
+		}
+	}
+
+	if len(uniqueKeys) == 0 {
+		return fmt.Errorf("no objects found in any bucket with prefix: %s", params.RestorePath)
+	}
+
+	// Create and write to the manifest file
 	file, err := os.Create(params.ManifestLocalPath)
 	if err != nil {
 		return fmt.Errorf("failed to create manifest file: %w", err)
@@ -34,26 +71,14 @@ func GenerateCSVManifest(ctx context.Context, s3Client S3ClientInterface, params
 	writer := csv.NewWriter(file)
 	defer writer.Flush()
 
-	input := &s3.ListObjectsV2Input{
-		Bucket: aws.String(params.AssetBucketList[0]),
-		Prefix: aws.String(params.RestorePath),
-	}
-
-	paginator := s3.NewListObjectsV2Paginator(s3Client, input)
-
-	for paginator.HasMorePages() {
-		output, err := paginator.NextPage(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to list objects: %w", err)
-		}
-
-		for _, obj := range output.Contents {
-			err := writer.Write([]string{params.AssetBucketList[0], *obj.Key})
-			if err != nil {
-				return fmt.Errorf("failed to write to CSV: %w", err)
-			}
+	// Write all unique entries to the CSV
+	for key, bucket := range uniqueKeys {
+		if err := writer.Write([]string{bucket, key}); err != nil {
+			return fmt.Errorf("failed to write to CSV: %w", err)
 		}
 	}
 
+	log.Printf("Generated manifest with %d unique objects from %d buckets",
+		len(uniqueKeys), len(params.AssetBucketList))
 	return nil
 }
