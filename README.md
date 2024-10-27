@@ -2,87 +2,86 @@
 
 ## Overview
 
-Pluto Restore Assets is a service designed to manage and monitor the restoration of assets from AWS S3 Glacier storage. It provides an HTTP server that listens for requests to initiate restore jobs and monitors their progress.
+Pluto Restore Assets is a service designed to manage and monitor the restoration of assets from AWS S3 Glacier storage. It consists of two main components: an API server and a worker service, both running in Kubernetes.
 
 ## Features
 
-- **HTTP Server**: Listens on port 9000 for incoming requests to create restore jobs.
-- **AWS S3 Integration**: Interacts with AWS S3 to manage asset restoration.
-- **Logging**: Provides detailed logging of requests and operations.
+- **API Server**: RESTful service listening on port 9000 for restore requests
+- **Worker Service**: Handles the actual restoration process with AWS S3
+- **Kubernetes Integration**: Runs as containerized services with proper RBAC
+- **AWS S3 Integration**: Manages asset restoration from Glacier
+- **Logging**: Comprehensive request and operation logging
 
 ## Environment Variables
 
-The application relies on several environment variables for configuration:
+The application requires the following environment variables:
 
-- `KUBE_NAMESPACE`: Kubernetes namespace to use (default is "default").
-- `ASSET_BUCKET_LIST`: Comma-separated list of asset buckets.
-- `MANIFEST_BUCKET`: S3 bucket for storing manifests.
-- `AWS_ROLE_ARN`: AWS role ARN for permissions.
-- `AWS_ACCESS_KEY_ID`: AWS access key ID.
-- `AWS_SECRET_ACCESS_KEY`: AWS secret access key.
-- `AWS_DEFAULT_REGION`: AWS region.
+- `KUBE_NAMESPACE`: Kubernetes namespace (default: "default")
+- `ASSET_BUCKET_LIST`: Comma-separated list of asset buckets
+- `MANIFEST_BUCKET`: S3 bucket for storing manifests
+- `AWS_ROLE_ARN`: AWS role ARN for permissions
+- `AWS_ACCESS_KEY_ID`: AWS access key ID
+- `AWS_SECRET_ACCESS_KEY`: AWS secret access key
+- `AWS_DEFAULT_REGION`: AWS region
+- `BASE_PATH`: Base path for restored assets
 
-## Endpoints
+## API Endpoints
 
-- **POST /createRestoreJob**: Initiates a restore job with the provided parameters.
+- **POST /api/v1/restore**: Create a new restore job
+  - Required fields: `id`, `user`, `path`
+- **GET /api/v1/restore/{id}**: Get status of a restore job
+- **GET /health**: Health check endpoint
 
 ## Code Structure
 
-- **main.go**: Contains the main server logic and request handling.
-  - [main.go](main.go)
-  - [createRestoreJob function](main.go)
-  - [LoggingMiddleware function](main.go)
-  - [getAWSAssetPath function](main.go)
+### API Server (`cmd/api/`)
+- `main.go`: Server initialization and routing
+- `handlers/`: Request handlers and interfaces
+  - `restore.go`: Main restore endpoint logic
+  - `interfaces.go`: Interface definitions
+  - `restore_test.go`: Handler unit tests
 
-- **s3utils**: Contains utility functions for interacting with AWS S3.
-  - [MonitorObjectRestoreStatus function](s3utils/monitor.go)
-  - [removeDirectories function](s3utils/monitor.go)
-  - [readManifestFile function](s3utils/monitor.go)
-  - [checkRestoreStatus function](s3utils/monitor.go)
+### Worker Service (`cmd/worker/`)
+- `main.go`: Worker process implementation
+- Handles AWS S3 interactions and restore operations
 
-- **worker**: Contains the worker logic for handling restore operations.
-  - [handleRestore function](worker/main.go)
-  - [initiateRestore function](worker/main.go)
-  - [getRestoreDetails function](worker/main.go)
+### Internal Packages
+- `internal/s3utils/`: AWS S3 utility functions
+- `internal/types/`: Shared type definitions
+- `pkg/kubernetes/`: Kubernetes integration
 
 ## Testing
 
-The project includes tests for various components, such as:
+The project includes comprehensive tests:
 
-- **s3utils/monitor_test.go**: Tests for monitoring and manifest reading.
-  - [TestCheckRestoreStatus function](s3utils/monitor_test.go)
-  - [TestReadManifestFile function](s3utils/monitor_test.go)
+- API Handler Tests: `cmd/api/handlers/restore_test.go`
+- S3 Utility Tests: `internal/s3utils/monitor_test.go`
+- Manifest Generation Tests: `internal/s3utils/manifest_test.go`
 
-- **s3utils/manifest_test.go**: Tests for manifest generation.
-  - [TestGenerateCSVManifest function](s3utils/manifest_test.go)
+## Building and Running Locally
 
-## Building and Running locally
-
-```make deploy-latest```
-
-
+```
+make deploy-latest
+```
 
 ## Kubernetes Configuration
 
-The project includes several Kubernetes configuration files to deploy and manage the application within a Kubernetes cluster.
+The service uses several Kubernetes resources:
 
-### Deployment
-
-The `deployment.yaml` file defines the deployment configuration for the `pluto-project-restore` service. It specifies the number of replicas, container image, environment variables, and ports.
+### Deployments
+- API Server deployment
+- Worker deployment for handling restore jobs
 
 ### Service
-
-The `service.yaml` file defines a Kubernetes Service to expose the `pluto-restore-assets` application on port 9000.
-
-### Ingress
-
-The `ingress.yaml` file configures an Ingress resource to route external HTTP requests to the appropriate services within the cluster. It includes paths for various services, including `pluto-restore-assets`.
+Exposes the API server on port 9000
 
 ### RBAC
+- `job-creator-role.yaml`: Defines permissions
+- `job-creator-rolebinding.yaml`: Binds role to service account
 
-The `job-creator-role.yaml` and `job-creator-rolebinding.yaml` files define the Role and RoleBinding for the `job-creator` service account, granting it permissions to manage Kubernetes jobs.
+## AWS S3 Glacier Restore Costs
 
-Summary of Costs for 1000 objects in Glacier totalling 1TB:
+Summary for 1000 objects totaling 1TB:
 
 | Retrieval Option | Retrieval Time | Total Cost |
 | ---------------- | -------------- | ---------- |
