@@ -57,9 +57,9 @@ jobs:
         uses: docker/setup-buildx-action@v2
       
       - name: Build Docker image pluto-restore-assets
-        run: docker build . -t "guardianmultimedia/pluto-restore-assets:${{ env.GITHUB_RUN_NUMBER }}"
+        run: docker build -f cmd/api/Dockerfile -t "guardianmultimedia/pluto-restore-assets:${{ env.GITHUB_RUN_NUMBER }}" .
       - name: Build Docker image pluto-restore-assets-worker
-        run: docker build -f worker/Dockerfile -t guardianmultimedia/pluto-restore-assets-worker:${{ env.GITHUB_RUN_NUMBER }} .
+        run: docker build -f cmd/worker/Dockerfile -t guardianmultimedia/pluto-restore-assets-worker:${{ env.GITHUB_RUN_NUMBER }} .
 
       - name: Tag Docker image pluto-restore-assets
         run: docker tag guardianmultimedia/pluto-restore-assets:${{ env.GITHUB_RUN_NUMBER }} ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/pluto-restore-assets:${{ env.GITHUB_RUN_NUMBER }}
