@@ -23,7 +23,8 @@ The application requires the following environment variables:
 - `AWS_ACCESS_KEY_ID`: AWS access key ID
 - `AWS_SECRET_ACCESS_KEY`: AWS secret access key
 - `AWS_DEFAULT_REGION`: AWS region
-- `BASE_PATH`: Base path for restored assets
+- `WORKER_IMAGE`: Docker image for the worker service
+- `BASE_PATH`: Base path for for local assets
 
 ## API Endpoints
 
