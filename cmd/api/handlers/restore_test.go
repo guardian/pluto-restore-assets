@@ -39,18 +39,20 @@ func TestCreateRestore(t *testing.T) {
 		{
 			name: "Valid request",
 			requestBody: types.RequestBody{
-				ID:   123,
-				User: "test.user@example.com",
-				Path: "/path/to/Assets/file.txt",
+				ID:            123,
+				User:          "test.user@example.com",
+				Path:          "/path/to/Assets/file.txt",
+				RetrievalType: "Standard",
 			},
 			expectedStatus: http.StatusAccepted,
 		},
 		{
 			name: "Invalid request - empty user",
 			requestBody: types.RequestBody{
-				ID:   123,
-				User: "",
-				Path: "/path/to/file.txt",
+				ID:            123,
+				User:          "",
+				Path:          "/path/to/file.txt",
+				RetrievalType: "Standard",
 			},
 			expectedStatus: http.StatusBadRequest,
 			expectedError:  "User is required",
@@ -58,9 +60,10 @@ func TestCreateRestore(t *testing.T) {
 		{
 			name: "Invalid request - empty path",
 			requestBody: types.RequestBody{
-				ID:   123,
-				User: "test.user@example.com",
-				Path: "",
+				ID:            123,
+				User:          "test.user@example.com",
+				Path:          "",
+				RetrievalType: "Standard",
 			},
 			expectedStatus: http.StatusBadRequest,
 			expectedError:  "Path is required",
@@ -68,9 +71,10 @@ func TestCreateRestore(t *testing.T) {
 		{
 			name: "Invalid request - zero ID",
 			requestBody: types.RequestBody{
-				ID:   0,
-				User: "test.user@example.com",
-				Path: "/path/to/file.txt",
+				ID:            0,
+				User:          "test.user@example.com",
+				Path:          "/path/to/file.txt",
+				RetrievalType: "Standard",
 			},
 			expectedStatus: http.StatusBadRequest,
 			expectedError:  "ID is required",
