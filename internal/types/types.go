@@ -11,12 +11,14 @@ type RestoreParams struct {
 	AWS_DEFAULT_REGION    string   `json:"aws_default_region"`
 	ProjectId             int      `json:"projectId"`
 	User                  string   `json:"user"`
+	RetrievalType         string   `json:"retrievalType"`
 	RestorePath           string   `json:"restorePath"`
 	BasePath              string   `json:"basePath"`
 }
 
 type RequestBody struct {
-	ID   int    `json:"id"`
-	Path string `json:"path"`
-	User string `json:"user"`
+	ID            int    `json:"id"`
+	Path          string `json:"path"`
+	User          string `json:"user"`
+	RetrievalType string `json:"retrievalType"`
 }

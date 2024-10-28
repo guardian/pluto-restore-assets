@@ -24,6 +24,11 @@ func InitiateS3BatchRestore(ctx context.Context, s3Client *s3.Client, s3ControlC
 	if err != nil {
 		return "", fmt.Errorf("failed to get current ETag: %w", err)
 	}
+	if params.RetrievalType == "Standard" {
+		params.RetrievalType = string(types.S3GlacierJobTierStandard) // Expedited is not supported, fallback to Standard
+	} else {
+		params.RetrievalType = string(types.S3GlacierJobTierBulk)
+	}
 
 	jobInput := &s3control.CreateJobInput{
 		AccountId: aws.String(accountID),
@@ -43,7 +48,7 @@ func InitiateS3BatchRestore(ctx context.Context, s3Client *s3.Client, s3ControlC
 		Operation: &types.JobOperation{
 			S3InitiateRestoreObject: &types.S3InitiateRestoreObjectOperation{
 				ExpirationInDays: aws.Int32(7),
-				GlacierJobTier:   types.S3GlacierJobTierStandard, // Can use Bulk for cheaper but slower, Expedited for faster but more expensive
+				GlacierJobTier:   types.S3GlacierJobTier(params.RetrievalType), // Can use Bulk for cheaper but slower, Standard for faster but more expensive
 			},
 		},
 		Priority: aws.Int32(10),

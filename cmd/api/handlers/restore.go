@@ -44,6 +44,11 @@ func (h *RestoreHandler) CreateRestore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if body.RetrievalType == "" {
+		http.Error(w, "Retrieval type is required", http.StatusBadRequest)
+		return
+	}
+
 	parts := strings.Split(body.User, "@")[0]
 	user := strings.Replace(parts, ".", "_", 1)
 
@@ -60,6 +65,7 @@ func (h *RestoreHandler) CreateRestore(w http.ResponseWriter, r *http.Request) {
 		AWS_DEFAULT_REGION:    os.Getenv("AWS_DEFAULT_REGION"),
 		ProjectId:             body.ID,
 		User:                  body.User,
+		RetrievalType:         body.RetrievalType,
 		RestorePath:           GetAWSAssetPath(body.Path),
 		BasePath:              os.Getenv("BASE_PATH"),
 	}
