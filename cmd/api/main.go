@@ -30,9 +30,9 @@ func main() {
 	mux := http.NewServeMux()
 
 	// API routes
-	mux.HandleFunc("POST /api/v1/restore", restoreHandler.CreateRestore)
-	mux.HandleFunc("GET /api/v1/restore/{id}", restoreHandler.GetStatus)
-	mux.HandleFunc("GET /health", healthHandler)
+	mux.HandleFunc("/POST /api/v1/restore", restoreHandler.CreateRestore)
+	mux.HandleFunc("/GET /api/v1/restore/{id}", restoreHandler.GetStatus)
+	mux.HandleFunc("/GET /health", healthHandler)
 
 	// Add logging middleware
 	handler := LoggingMiddleware(mux)
