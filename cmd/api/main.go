@@ -30,9 +30,9 @@ func main() {
 	mux := http.NewServeMux()
 
 	// API routes
-	mux.HandleFunc("/POST /api/v1/restore", restoreHandler.CreateRestore)
-	mux.HandleFunc("/GET /api/v1/restore/{id}", restoreHandler.GetStatus)
-	mux.HandleFunc("/GET /health", healthHandler)
+	mux.HandleFunc("/api/v1/restore", restoreHandler.CreateRestore)
+	mux.HandleFunc("/api/v1/restore/{id}", restoreHandler.GetStatus)
+	mux.HandleFunc("/health", healthHandler)
 
 	// Add logging middleware
 	handler := LoggingMiddleware(mux)
@@ -52,6 +52,12 @@ func main() {
 func LoggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
+
+		log.Printf("DEBUG - Full URL: %s", r.URL.String())
+		log.Printf("DEBUG - Method: %s", r.Method)
+		log.Printf("DEBUG - Path: %s", r.URL.Path)
+		log.Printf("DEBUG - Raw Path: %s", r.URL.RawPath)
+		log.Printf("DEBUG - RequestURI: %s", r.RequestURI)
 
 		log.Printf("Received %s request to %s", r.Method, r.URL.Path)
 

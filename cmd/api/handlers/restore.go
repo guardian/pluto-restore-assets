@@ -22,6 +22,11 @@ func NewRestoreHandler(jobCreator JobCreator) *RestoreHandler {
 }
 
 func (h *RestoreHandler) CreateRestore(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
 	var body types.RequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "Failed to parse request body", http.StatusBadRequest)
@@ -91,6 +96,11 @@ func GetAWSAssetPath(fullPath string) string {
 }
 
 func (h *RestoreHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
 	jobID := r.PathValue("id")
 	log.Printf("Job ID: %s", jobID)
 	if jobID == "" {
