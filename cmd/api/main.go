@@ -32,7 +32,7 @@ func main() {
 	// API routes
 	mux.HandleFunc("POST /", restoreHandler.CreateRestore)
 	mux.HandleFunc("GET /}", restoreHandler.GetStatus)
-	mux.HandleFunc("/health", healthHandler)
+	mux.HandleFunc("GET /health", healthHandler)
 
 	// Add logging middleware
 	handler := LoggingMiddleware(mux)
