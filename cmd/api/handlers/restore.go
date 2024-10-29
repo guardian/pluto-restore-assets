@@ -72,7 +72,7 @@ func (h *RestoreHandler) CreateRestore(w http.ResponseWriter, r *http.Request) {
 		User:                  body.User,
 		RetrievalType:         body.RetrievalType,
 		RestorePath:           GetAWSAssetPath(body.Path),
-		BasePath:              os.Getenv("BASE_PATH"),
+		BasePath:              GetBasePath(body.Path),
 	}
 
 	if err := h.jobCreator.CreateRestoreJob(params); err != nil {
@@ -93,6 +93,14 @@ func GetAWSAssetPath(fullPath string) string {
 		return parts[1] + "/"
 	}
 	return fullPath + "/"
+}
+
+func GetBasePath(fullPath string) string {
+	parts := strings.Split(fullPath, "/Assets/")
+	if len(parts) > 1 {
+		return parts[0] + "/"
+	}
+	return fullPath
 }
 
 func (h *RestoreHandler) GetStatus(w http.ResponseWriter, r *http.Request) {

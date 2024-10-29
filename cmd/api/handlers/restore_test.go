@@ -126,3 +126,22 @@ func TestGetAWSAssetPath(t *testing.T) {
 		})
 	}
 }
+
+func TestGetBasePath(t *testing.T) {
+	tests := []struct {
+		name     string
+		fullPath string
+		want     string
+	}{
+		{"With Assets", "/path/to/Assets/folder/file.txt", "/path/to/"},
+		{"String with spaces", "path/to/Assets/folder/file with spaces.txt", "path/to/"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := GetBasePath(tt.fullPath); got != tt.want {
+				t.Errorf("getBasePath() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
