@@ -53,12 +53,6 @@ func LoggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 
-		log.Printf("DEBUG - Full URL: %s", r.URL.String())
-		log.Printf("DEBUG - Method: %s", r.Method)
-		log.Printf("DEBUG - Path: %s", r.URL.Path)
-		log.Printf("DEBUG - Raw Path: %s", r.URL.RawPath)
-		log.Printf("DEBUG - RequestURI: %s", r.RequestURI)
-
 		log.Printf("Received %s request to %s", r.Method, r.URL.Path)
 
 		if r.Method == http.MethodPost {
