@@ -135,9 +135,9 @@ func GetBasePath(fullPath string) string {
 }
 
 func (h *RestoreHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
-	log.Printf("GetStatus called:Received request method: %s", r.Method)
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	log.Printf("GetStatus called: Received request to %s", r.URL.Path)
+	if r.URL.Path != "/stats" && r.URL.Path != "/" {
+		http.Error(w, "Not found", http.StatusNotFound)
 		return
 	}
 
