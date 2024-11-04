@@ -48,11 +48,15 @@ func main() {
 func handleRestore(ctx context.Context, s3Client *s3.Client, s3ControlClient *s3control.Client, params types.RestoreParams) error {
 	log.Println("handleRestore function called")
 
-	if err := s3utils.GenerateCSVManifest(ctx, s3Client, params); err != nil {
-		return fmt.Errorf("generate CSV manifest: %w", err)
-	}
+	// var stats *s3utils.ManifestStats
+	// stats, err := s3utils.GenerateCSVManifest(ctx, s3Client, params)
+	// if err != nil {
+	// 	return fmt.Errorf("generate CSV manifest: %w", err)
+	// }
 
-	log.Println("CSV manifest generated successfully")
+	// fmt.Println("Stats: ", stats)
+
+	// log.Println("CSV manifest generated successfully")
 
 	jobID, err := initiateRestore(ctx, s3Client, s3ControlClient, params)
 	if err != nil {
@@ -73,9 +77,9 @@ func handleRestore(ctx context.Context, s3Client *s3.Client, s3ControlClient *s3
 	return nil
 }
 func initiateRestore(ctx context.Context, s3Client *s3.Client, s3ControlClient *s3control.Client, params types.RestoreParams) (string, error) {
-	if _, err := s3utils.UploadFileToS3(ctx, s3Client, params.ManifestBucket, params.ManifestKey, params.ManifestLocalPath); err != nil {
-		return "", fmt.Errorf("upload manifest: %w", err)
-	}
+	// if _, err := s3utils.UploadFileToS3(ctx, s3Client, params.ManifestBucket, params.ManifestKey, params.ManifestLocalPath); err != nil {
+	// 	return "", fmt.Errorf("upload manifest: %w", err)
+	// }
 
 	accountID, manifestETag, err := getRestoreDetails(ctx, s3Client, params)
 	if err != nil {

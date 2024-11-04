@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -9,15 +10,27 @@ import (
 	"pluto-restore-assets/internal/types"
 	"strings"
 	"time"
+
+	"pluto-restore-assets/internal/s3utils"
+
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
+
+type S3ClientAPI interface {
+	ListObjectsV2(ctx context.Context, params *s3.ListObjectsV2Input, optFns ...func(*s3.Options)) (*s3.ListObjectsV2Output, error)
+	PutObject(ctx context.Context, params *s3.PutObjectInput, optFns ...func(*s3.Options)) (*s3.PutObjectOutput, error)
+	HeadObject(ctx context.Context, params *s3.HeadObjectInput, optFns ...func(*s3.Options)) (*s3.HeadObjectOutput, error)
+}
 
 type RestoreHandler struct {
 	jobCreator JobCreator
+	s3Client   S3ClientAPI
 }
 
-func NewRestoreHandler(jobCreator JobCreator) *RestoreHandler {
+func NewRestoreHandler(jobCreator JobCreator, s3Client S3ClientAPI) *RestoreHandler {
 	return &RestoreHandler{
 		jobCreator: jobCreator,
+		s3Client:   s3Client,
 	}
 }
 
@@ -75,15 +88,33 @@ func (h *RestoreHandler) CreateRestore(w http.ResponseWriter, r *http.Request) {
 		BasePath:              GetBasePath(body.Path),
 	}
 
-	if err := h.jobCreator.CreateRestoreJob(params); err != nil {
-		http.Error(w, fmt.Sprintf("Failed to create restore job: %v", err), http.StatusInternalServerError)
+	// Generate manifest first
+	stats, err := s3utils.GenerateCSVManifest(r.Context(), h.s3Client, params)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to generate manifest: %v", err), http.StatusInternalServerError)
 		return
 	}
 
+	// Upload manifest to S3
+	_, err = s3utils.UploadFileToS3(r.Context(), h.s3Client, params.ManifestBucket, params.ManifestKey, params.ManifestLocalPath)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to upload manifest: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Create the restore job asynchronously
+	go func() {
+		if err := h.jobCreator.CreateRestoreJob(params); err != nil {
+			log.Printf("Failed to create restore job: %v", err)
+		}
+	}()
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted)
-	json.NewEncoder(w).Encode(map[string]string{
-		"message": "Restore job created",
+	json.NewEncoder(w).Encode(types.RestoreResponse{
+		Message:   "Restore job created",
+		FileCount: int64(stats.FileCount),
+		TotalSize: int64(stats.TotalSize),
 	})
 }
 
@@ -104,27 +135,81 @@ func GetBasePath(fullPath string) string {
 }
 
 func (h *RestoreHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
+	log.Printf("GetStatus called:Received request method: %s", r.Method)
+	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	jobID := r.PathValue("id")
-	log.Printf("Job ID: %s", jobID)
-	if jobID == "" {
-		http.Error(w, "Job ID is required", http.StatusBadRequest)
+	var body types.RequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "Failed to parse request body", http.StatusBadRequest)
 		return
 	}
 
-	logs, err := h.jobCreator.GetJobLogs(jobID)
+	params := types.RestoreParams{
+		AssetBucketList: strings.Split(os.Getenv("ASSET_BUCKET_LIST"), ","),
+		ManifestBucket:  os.Getenv("MANIFEST_BUCKET"),
+		// ManifestKey:           fmt.Sprintf("batch-manifests/%d_%v_%s.csv", body.ID, user, time.Now().Format("2006-01-02_15-04-05")),
+		ManifestLocalPath:     "/tmp/manifest.csv",
+		RoleArn:               os.Getenv("AWS_ROLE_ARN"),
+		AWS_ACCESS_KEY_ID:     os.Getenv("AWS_ACCESS_KEY_ID"),
+		AWS_SECRET_ACCESS_KEY: os.Getenv("AWS_SECRET_ACCESS_KEY"),
+		AWS_DEFAULT_REGION:    os.Getenv("AWS_DEFAULT_REGION"),
+		ProjectId:             body.ID,
+		User:                  body.User,
+		RetrievalType:         body.RetrievalType,
+		RestorePath:           "test_commission/test_project/", //GetAWSAssetPath(body.Path),//GetAWSAssetPath(body.Path),
+		BasePath:              GetBasePath(body.Path),
+	}
+
+	stats, err := s3utils.GenerateCSVManifest(r.Context(), h.s3Client, params)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to get job logs: %v", err), http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("Failed to generate manifest: %v", err), http.StatusInternalServerError)
 		return
 	}
+
+	log.Printf("Received request body: %+v", r.Body)
+	log.Printf("Total size: %v", stats.TotalSize)
+
+	standardCost, bulkCost := calculateGlacierRetrievalCosts(float64(stats.FileCount), float64(stats.TotalSize))
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"jobId": jobID,
-		"logs":  logs,
+		"numberOfFiles":         stats.FileCount,
+		"totalSize":             float64(stats.TotalSize) / float64(1024*1024*1024), // Convert to GB
+		"standardRetrievalCost": standardCost,
+		"bulkRetrievalCost":     bulkCost,
 	})
+}
+
+const (
+	// Restore request costs per 1000 requests
+	STANDARD_RESTORE_REQUEST_COST_PER_1000 = 0.03  // $0.03 per 1000 requests
+	BULK_RESTORE_REQUEST_COST_PER_1000     = 0.025 // $0.025 per 1000 requests
+
+	// GET request costs per 1000 requests
+	GET_REQUEST_COST_PER_1000 = 0.0004 // $0.0004 per 1000 requests
+
+	// Data transfer cost
+	DATA_TRANSFER_COST_PER_GB = 0.09 // $0.09 per GB
+)
+
+func calculateGlacierRetrievalCosts(numberOfFiles float64, totalDataBytes float64) (float64, float64) {
+	// Convert bytes to GB
+	totalDataGB := totalDataBytes / (1024 * 1024 * 1024)
+
+	// Standard Retrieval Cost Calculation
+	standardRestoreRequestCost := (numberOfFiles * STANDARD_RESTORE_REQUEST_COST_PER_1000) / 1000
+	standardGetRequestCost := (numberOfFiles * GET_REQUEST_COST_PER_1000) / 1000
+	standardDataTransferCost := totalDataGB * DATA_TRANSFER_COST_PER_GB
+	totalStandardCost := standardRestoreRequestCost + standardGetRequestCost + standardDataTransferCost
+
+	// Bulk Retrieval Cost Calculation
+	bulkRestoreRequestCost := (numberOfFiles * BULK_RESTORE_REQUEST_COST_PER_1000) / 1000
+	bulkGetRequestCost := (numberOfFiles * GET_REQUEST_COST_PER_1000) / 1000
+	bulkDataTransferCost := totalDataGB * DATA_TRANSFER_COST_PER_GB
+	totalBulkCost := bulkRestoreRequestCost + bulkGetRequestCost + bulkDataTransferCost
+
+	return totalStandardCost, totalBulkCost
 }

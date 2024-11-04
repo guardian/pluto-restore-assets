@@ -22,3 +22,10 @@ type RequestBody struct {
 	User          string `json:"user"`
 	RetrievalType string `json:"retrievalType"`
 }
+
+type RestoreResponse struct {
+	Message   string `json:"message"`
+	JobID     string `json:"jobId"`
+	FileCount int64  `json:"fileCount"`
+	TotalSize int64  `json:"totalSize"`
+}

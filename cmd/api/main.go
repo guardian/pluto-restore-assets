@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"log"
 	"net/http"
@@ -9,6 +10,9 @@ import (
 	"pluto-restore-assets/cmd/api/handlers"
 	"pluto-restore-assets/pkg/kubernetes"
 	"time"
+
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
 func main() {
@@ -23,15 +27,22 @@ func main() {
 		log.Fatalf("Failed to create job creator: %v", err)
 	}
 
+	// Create S3 client
+	cfg, err := config.LoadDefaultConfig(context.Background())
+	if err != nil {
+		log.Fatalf("Failed to load AWS config: %v", err)
+	}
+	s3Client := s3.NewFromConfig(cfg)
+
 	// Create handlers
-	restoreHandler := handlers.NewRestoreHandler(jobCreator)
+	restoreHandler := handlers.NewRestoreHandler(jobCreator, s3Client)
 
 	// Setup routes
 	mux := http.NewServeMux()
 
 	// API routes
-	mux.HandleFunc("POST /", restoreHandler.CreateRestore)
-	mux.HandleFunc("GET /}", restoreHandler.GetStatus)
+	mux.HandleFunc("POST /restore", restoreHandler.CreateRestore)
+	mux.HandleFunc("POST /stats", restoreHandler.GetStatus)
 	mux.HandleFunc("GET /health", healthHandler)
 
 	// Add logging middleware

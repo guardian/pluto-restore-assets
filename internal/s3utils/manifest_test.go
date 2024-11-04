@@ -44,29 +44,38 @@ func TestGenerateCSVManifest(t *testing.T) {
 				ManifestLocalPath: filepath.Join(tempDir, "manifest1.csv"),
 			},
 			setup: func() {
-				// First bucket has files
-				mockS3Client.EXPECT().ListObjectsV2(
-					gomock.Any(),
-					&s3.ListObjectsV2Input{
-						Bucket: aws.String("bucket1"),
-						Prefix: aws.String("test-prefix/"),
-					},
-					gomock.Any(),
-				).Return(&s3.ListObjectsV2Output{
+				// First bucket call
+				mockS3Client.EXPECT().
+					ListObjectsV2(
+						gomock.Any(),
+						&s3.ListObjectsV2Input{
+							Bucket: aws.String("bucket1"),
+							Prefix: aws.String("test-prefix/"),
+						},
+						gomock.Any(),
+					).Return(&s3.ListObjectsV2Output{
 					Contents: []types.Object{
-						{Key: aws.String("test-prefix/file1.txt")},
+						{
+							Key:  aws.String("test-prefix/file1.txt"),
+							Size: aws.Int64(100),
+						},
 					},
+					IsTruncated: aws.Bool(false),
 				}, nil)
 
-				// Second bucket is empty
-				mockS3Client.EXPECT().ListObjectsV2(
-					gomock.Any(),
-					&s3.ListObjectsV2Input{
-						Bucket: aws.String("bucket2"),
-						Prefix: aws.String("test-prefix/"),
-					},
-					gomock.Any(),
-				).Return(&s3.ListObjectsV2Output{}, nil)
+				// Second bucket call
+				mockS3Client.EXPECT().
+					ListObjectsV2(
+						gomock.Any(),
+						&s3.ListObjectsV2Input{
+							Bucket: aws.String("bucket2"),
+							Prefix: aws.String("test-prefix/"),
+						},
+						gomock.Any(),
+					).Return(&s3.ListObjectsV2Output{
+					Contents:    []types.Object{},
+					IsTruncated: aws.Bool(false),
+				}, nil)
 			},
 			expectedFiles: map[string]string{
 				"test-prefix/file1.txt": "bucket1",
@@ -80,32 +89,48 @@ func TestGenerateCSVManifest(t *testing.T) {
 				ManifestLocalPath: filepath.Join(tempDir, "manifest2.csv"),
 			},
 			setup: func() {
+				// First bucket call
 				mockS3Client.EXPECT().ListObjectsV2(
 					gomock.Any(),
-					&s3.ListObjectsV2Input{
+					gomock.Eq(&s3.ListObjectsV2Input{
 						Bucket: aws.String("bucket1"),
 						Prefix: aws.String("test-prefix/"),
-					},
+					}),
 					gomock.Any(),
 				).Return(&s3.ListObjectsV2Output{
 					Contents: []types.Object{
-						{Key: aws.String("test-prefix/file1.txt")},
-						{Key: aws.String("test-prefix/shared.txt")},
+						{
+							Key:  aws.String("test-prefix/file1.txt"),
+							Size: aws.Int64(100),
+						},
+						{
+							Key:  aws.String("test-prefix/shared.txt"),
+							Size: aws.Int64(100),
+						},
 					},
+					IsTruncated: aws.Bool(false),
 				}, nil)
 
+				// Second bucket call
 				mockS3Client.EXPECT().ListObjectsV2(
 					gomock.Any(),
-					&s3.ListObjectsV2Input{
+					gomock.Eq(&s3.ListObjectsV2Input{
 						Bucket: aws.String("bucket2"),
 						Prefix: aws.String("test-prefix/"),
-					},
+					}),
 					gomock.Any(),
 				).Return(&s3.ListObjectsV2Output{
 					Contents: []types.Object{
-						{Key: aws.String("test-prefix/file2.txt")},
-						{Key: aws.String("test-prefix/shared.txt")},
+						{
+							Key:  aws.String("test-prefix/file2.txt"),
+							Size: aws.Int64(100),
+						},
+						{
+							Key:  aws.String("test-prefix/shared.txt"),
+							Size: aws.Int64(100),
+						},
 					},
+					IsTruncated: aws.Bool(false),
 				}, nil)
 			},
 			expectedFiles: map[string]string{
@@ -121,7 +146,7 @@ func TestGenerateCSVManifest(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.setup()
 
-			err := GenerateCSVManifest(context.Background(), mockS3Client, tc.params)
+			stats, err := GenerateCSVManifest(context.Background(), mockS3Client, tc.params)
 
 			if tc.expectError {
 				assert.Error(t, err)
@@ -129,6 +154,7 @@ func TestGenerateCSVManifest(t *testing.T) {
 			}
 
 			assert.NoError(t, err)
+			assert.NotNil(t, stats)
 
 			// Verify the manifest contents
 			content, err := os.ReadFile(tc.params.ManifestLocalPath)

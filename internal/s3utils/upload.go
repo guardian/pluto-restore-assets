@@ -15,7 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
-func UploadFileToS3(ctx context.Context, s3Client *s3.Client, bucket, key, filePath string) (*s3.PutObjectOutput, error) {
+func UploadFileToS3(ctx context.Context, s3Client S3ClientInterface, bucket, key, filePath string) (*s3.PutObjectOutput, error) {
 	log.Printf("Uploading file to S3: s3://%s/%s", bucket, key)
 
 	cfg, err := config.LoadDefaultConfig(context.TODO())
