@@ -136,7 +136,9 @@ func GetBasePath(fullPath string) string {
 
 func (h *RestoreHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
 	log.Printf("GetStatus called: Received request to %s", r.URL.Path)
-	if r.URL.Path != "/stats" && r.URL.Path != "/" {
+
+	// Check if the request path is /project-restore/stats
+	if !strings.HasSuffix(r.URL.Path, "/project-restore/stats") && r.URL.Path != "/stats" {
 		http.Error(w, "Not found", http.StatusNotFound)
 		return
 	}
