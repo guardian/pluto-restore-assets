@@ -129,7 +129,7 @@ func GetAWSAssetPath(fullPath string) string {
 func GetBasePath(fullPath string) string {
 	parts := strings.Split(fullPath, "/Assets/")
 	if len(parts) > 1 {
-		return parts[0] + "/"
+		return parts[0] + "/Assets/"
 	}
 	return fullPath
 }

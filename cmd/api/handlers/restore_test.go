@@ -264,8 +264,8 @@ func TestGetBasePath(t *testing.T) {
 		fullPath string
 		want     string
 	}{
-		{"With Assets", "/path/to/Assets/folder/file.txt", "/path/to/"},
-		{"String with spaces", "path/to/Assets/folder/file with spaces.txt", "path/to/"},
+		{"With Assets", "/path/to/Assets/folder/file.txt", "/path/to/Assets/"},
+		{"String with spaces", "path/to/Assets/folder/file with spaces.txt", "path/to/Assets/"},
 	}
 
 	for _, tt := range tests {
