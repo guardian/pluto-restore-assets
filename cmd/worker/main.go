@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"pluto-restore-assets/internal/s3utils"
@@ -48,15 +49,10 @@ func main() {
 func handleRestore(ctx context.Context, s3Client *s3.Client, s3ControlClient *s3control.Client, params types.RestoreParams) error {
 	log.Println("handleRestore function called")
 
-	// var stats *s3utils.ManifestStats
-	// stats, err := s3utils.GenerateCSVManifest(ctx, s3Client, params)
-	// if err != nil {
-	// 	return fmt.Errorf("generate CSV manifest: %w", err)
-	// }
-
-	// fmt.Println("Stats: ", stats)
-
-	// log.Println("CSV manifest generated successfully")
+	// Download manifest from S3 first
+	if err := downloadManifest(ctx, s3Client, params); err != nil {
+		return fmt.Errorf("failed to download manifest: %w", err)
+	}
 
 	jobID, err := initiateRestore(ctx, s3Client, s3ControlClient, params)
 	if err != nil {
@@ -76,6 +72,30 @@ func handleRestore(ctx context.Context, s3Client *s3.Client, s3ControlClient *s3
 	log.Println("Restore process completed")
 	return nil
 }
+
+func downloadManifest(ctx context.Context, s3Client *s3.Client, params types.RestoreParams) error {
+	result, err := s3Client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(params.ManifestBucket),
+		Key:    aws.String(params.ManifestKey),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to get manifest from S3: %w", err)
+	}
+	defer result.Body.Close()
+
+	file, err := os.Create(params.ManifestLocalPath)
+	if err != nil {
+		return fmt.Errorf("failed to create local manifest file: %w", err)
+	}
+	defer file.Close()
+
+	if _, err := io.Copy(file, result.Body); err != nil {
+		return fmt.Errorf("failed to write manifest file: %w", err)
+	}
+
+	return nil
+}
+
 func initiateRestore(ctx context.Context, s3Client *s3.Client, s3ControlClient *s3control.Client, params types.RestoreParams) (string, error) {
 	// if _, err := s3utils.UploadFileToS3(ctx, s3Client, params.ManifestBucket, params.ManifestKey, params.ManifestLocalPath); err != nil {
 	// 	return "", fmt.Errorf("upload manifest: %w", err)
