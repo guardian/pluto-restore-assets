@@ -1,5 +1,7 @@
 package types
 
+import "time"
+
 type RestoreParams struct {
 	AssetBucketList       []string `json:"assetBucketList"`
 	ManifestKey           string   `json:"manifestKey"`
@@ -28,4 +30,12 @@ type RestoreResponse struct {
 	JobID     string `json:"jobId"`
 	FileCount int64  `json:"fileCount"`
 	TotalSize int64  `json:"totalSize"`
+}
+
+type RestoreStats struct {
+	FileCount    int64
+	TotalSize    int64
+	StandardCost float64
+	BulkCost     float64
+	Timestamp    time.Time
 }

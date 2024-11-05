@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"pluto-restore-assets/internal/notification"
 	"pluto-restore-assets/internal/s3utils"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -25,12 +26,14 @@ type S3ClientAPI interface {
 type RestoreHandler struct {
 	jobCreator JobCreator
 	s3Client   S3ClientAPI
+	statsCache map[string]*types.RestoreStats
 }
 
 func NewRestoreHandler(jobCreator JobCreator, s3Client S3ClientAPI) *RestoreHandler {
 	return &RestoreHandler{
 		jobCreator: jobCreator,
 		s3Client:   s3Client,
+		statsCache: make(map[string]*types.RestoreStats),
 	}
 }
 
@@ -171,10 +174,20 @@ func (h *RestoreHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	standardCost, bulkCost := calculateGlacierRetrievalCosts(float64(stats.FileCount), float64(stats.TotalSize))
+
+	// Cache the stats using project ID as key
+	cacheKey := fmt.Sprintf("%d", body.ID)
+	h.statsCache[cacheKey] = &types.RestoreStats{
+		FileCount:    int64(stats.FileCount),
+		TotalSize:    stats.TotalSize,
+		StandardCost: standardCost,
+		BulkCost:     bulkCost,
+		Timestamp:    time.Now(),
+	}
+
 	log.Printf("Received request body: %+v", r.Body)
 	log.Printf("Total size: %v", stats.TotalSize)
-
-	standardCost, bulkCost := calculateGlacierRetrievalCosts(float64(stats.FileCount), float64(stats.TotalSize))
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -214,4 +227,55 @@ func calculateGlacierRetrievalCosts(numberOfFiles float64, totalDataBytes float6
 	totalBulkCost := bulkRestoreRequestCost + bulkGetRequestCost + bulkDataTransferCost
 
 	return totalStandardCost, totalBulkCost
+}
+
+func (h *RestoreHandler) Notify(w http.ResponseWriter, r *http.Request) {
+	log.Printf("Notify called: Received request to %s", r.URL.Path)
+	var body types.RequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "Failed to parse request body", http.StatusBadRequest)
+		return
+	}
+
+	cacheKey := fmt.Sprintf("%d", body.ID)
+	cachedStats, exists := h.statsCache[cacheKey]
+	if !exists {
+		http.Error(w, "No stats found. Please call /stats endpoint first", http.StatusBadRequest)
+		return
+	}
+
+	// Delete stats older than 5 minutes
+	if time.Since(cachedStats.Timestamp) > 5*time.Minute {
+		delete(h.statsCache, cacheKey)
+		http.Error(w, "Stats expired. Please call /stats endpoint again", http.StatusBadRequest)
+		return
+	}
+
+	emailSender := notification.NewSMTPEmailSender()
+	subject := fmt.Sprintf("Asset Restore Stats - Project %d", body.ID)
+	emailBody := fmt.Sprintf(
+		"Asset Restore Statistics\n"+
+			"Project ID: %d\n"+
+			"User: %s\n"+
+			"Path: %s\n"+
+			"Total Files: %d\n"+
+			"Total Size: %.2f GB\n"+
+			"Standard Retrieval Cost: $%.2f\n"+
+			"Bulk Retrieval Cost: $%.2f",
+		body.ID, body.User, body.Path,
+		cachedStats.FileCount,
+		float64(cachedStats.TotalSize)/(1024*1024*1024),
+		cachedStats.StandardCost,
+		cachedStats.BulkCost)
+
+	if err := emailSender.SendEmail(subject, emailBody); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to send notification: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{
+		"message": "Notification sent successfully",
+	})
 }
