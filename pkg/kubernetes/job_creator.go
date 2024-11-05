@@ -56,11 +56,15 @@ func (jc *JobCreator) CreateRestoreJob(params types.RestoreParams) error {
 		return fmt.Errorf("failed to marshal restore params: %w", err)
 	}
 
+	ttlSeconds := int32(240) // 3 days in seconds = 259200
+
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: jobName,
 		},
 		Spec: batchv1.JobSpec{
+
+			TTLSecondsAfterFinished: &ttlSeconds,
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
