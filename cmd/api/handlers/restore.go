@@ -153,9 +153,9 @@ func (h *RestoreHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	params := types.RestoreParams{
-		AssetBucketList: strings.Split(os.Getenv("ASSET_BUCKET_LIST"), ","),
-		ManifestBucket:  os.Getenv("MANIFEST_BUCKET"),
-		// ManifestKey:           fmt.Sprintf("batch-manifests/%d_%v_%s.csv", body.ID, user, time.Now().Format("2006-01-02_15-04-05")),
+		AssetBucketList:       strings.Split(os.Getenv("ASSET_BUCKET_LIST"), ","),
+		ManifestBucket:        os.Getenv("MANIFEST_BUCKET"),
+		ManifestKey:           fmt.Sprintf("batch-manifests/%d_%v_%s.csv", body.ID, body.User, time.Now().Format("2006-01-02_15-04-05")),
 		ManifestLocalPath:     "/tmp/manifest.csv",
 		RoleArn:               os.Getenv("AWS_ROLE_ARN"),
 		AWS_ACCESS_KEY_ID:     os.Getenv("AWS_ACCESS_KEY_ID"),
@@ -164,7 +164,7 @@ func (h *RestoreHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
 		ProjectId:             body.ID,
 		User:                  body.User,
 		RetrievalType:         body.RetrievalType,
-		RestorePath:           "test_commission/test_project/", //GetAWSAssetPath(body.Path),//GetAWSAssetPath(body.Path),
+		RestorePath:           GetAWSAssetPath(body.Path), //GetAWSAssetPath(body.Path),
 		BasePath:              GetBasePath(body.Path),
 	}
 
