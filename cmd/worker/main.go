@@ -35,6 +35,12 @@ func main() {
 	os.Setenv("SMTP_PORT", params.SMTPPort)
 	os.Setenv("NOTIFICATION_EMAIL", params.NotificationEmail)
 
+	// Verify these are not empty strings
+	log.Printf("Setting SMTP settings - Host: %s, Port: %s", params.SMTPHost, params.SMTPPort)
+	os.Setenv("SMTP_HOST", params.SMTPHost)
+	os.Setenv("SMTP_PORT", params.SMTPPort)
+	os.Setenv("SMTP_FROM", params.SMTPFrom)
+
 	ctx := context.Background()
 	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
@@ -75,15 +81,30 @@ func handleRestore(ctx context.Context, s3Client *s3.Client, s3ControlClient *s3
 	}
 
 	log.Println("Restore process completed")
-	// Send notification email
-	emailSender := notification.NewSMTPEmailSender()
+	// Add debug logging for SMTP settings
+	log.Printf("SMTP Settings - Host: %s, Port: %s, From: %s, To: %s",
+		os.Getenv("SMTP_HOST"),
+		os.Getenv("SMTP_PORT"),
+		os.Getenv("SMTP_FROM"),
+		params.NotificationEmail)
+
+	// Set notification email explicitly since it's in params
+	os.Setenv("NOTIFICATION_EMAIL", params.NotificationEmail)
+
+	emailSender := notification.NewSMTPEmailSender(
+		params.SMTPHost,
+		params.SMTPPort,
+		params.SMTPFrom,
+		params.NotificationEmail,
+	)
 	subject := fmt.Sprintf("Asset Restore Completed for Project %d", params.ProjectId)
 	emailBody := fmt.Sprintf(
 		"Project Asset Restore Completed.\n\n"+
 			"User requesting restore: %v\n"+
 			"Retrieval Type: %v\n",
 		params.User, params.RetrievalType)
-	log.Printf("Sending notification email to %v", params.User)
+
+	log.Printf("Sending notification email to %v", params.NotificationEmail)
 	err = emailSender.SendEmail(subject, emailBody)
 
 	if err != nil {

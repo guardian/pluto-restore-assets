@@ -255,7 +255,12 @@ func (h *RestoreHandler) Notify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	emailSender := notification.NewSMTPEmailSender()
+	emailSender := notification.NewSMTPEmailSender(
+		os.Getenv("SMTP_HOST"),
+		os.Getenv("SMTP_PORT"),
+		os.Getenv("SMTP_FROM"),
+		os.Getenv("NOTIFICATION_EMAIL"),
+	)
 	subject := fmt.Sprintf("Asset Restore Stats - Project %d", body.ID)
 	emailBody := fmt.Sprintf(
 		"Project Asset Restore Request\n\n"+
