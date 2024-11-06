@@ -175,6 +175,7 @@ func (h *RestoreHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
 		SMTPHost:              os.Getenv("SMTP_HOST"),
 		SMTPPort:              os.Getenv("SMTP_PORT"),
 		NotificationEmail:     os.Getenv("NOTIFICATION_EMAIL"),
+		PlutoProjectURL:       os.Getenv("PLUTO_PROJECT_URL"),
 	}
 
 	stats, err := s3utils.GenerateCSVManifest(r.Context(), h.s3Client, params)
