@@ -166,6 +166,10 @@ func (h *RestoreHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
 		RetrievalType:         body.RetrievalType,
 		RestorePath:           GetAWSAssetPath(body.Path), //GetAWSAssetPath(body.Path),
 		BasePath:              GetBasePath(body.Path),
+		SMTPFrom:              os.Getenv("SMTP_FROM"),
+		SMTPHost:              os.Getenv("SMTP_HOST"),
+		SMTPPort:              os.Getenv("SMTP_PORT"),
+		NotificationEmail:     os.Getenv("NOTIFICATION_EMAIL"),
 	}
 
 	stats, err := s3utils.GenerateCSVManifest(r.Context(), h.s3Client, params)

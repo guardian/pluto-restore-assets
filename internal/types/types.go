@@ -16,6 +16,10 @@ type RestoreParams struct {
 	RetrievalType         string   `json:"retrievalType"`
 	RestorePath           string   `json:"restorePath"`
 	BasePath              string   `json:"basePath"`
+	SMTPFrom              string   `json:"smtpFrom"`
+	SMTPHost              string   `json:"smtpHost"`
+	SMTPPort              string   `json:"smtpPort"`
+	NotificationEmail     string   `json:"notificationEmail"`
 }
 
 type RequestBody struct {

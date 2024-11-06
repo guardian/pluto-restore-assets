@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"pluto-restore-assets/internal/notification"
 	"pluto-restore-assets/internal/s3utils"
 	types "pluto-restore-assets/internal/types"
 	"time"
@@ -29,6 +30,10 @@ func main() {
 	os.Setenv("AWS_ACCESS_KEY_ID", params.AWS_ACCESS_KEY_ID)
 	os.Setenv("AWS_SECRET_ACCESS_KEY", params.AWS_SECRET_ACCESS_KEY)
 	os.Setenv("AWS_DEFAULT_REGION", params.AWS_DEFAULT_REGION)
+	os.Setenv("SMTP_FROM", params.SMTPFrom)
+	os.Setenv("SMTP_HOST", params.SMTPHost)
+	os.Setenv("SMTP_PORT", params.SMTPPort)
+	os.Setenv("NOTIFICATION_EMAIL", params.NotificationEmail)
 
 	ctx := context.Background()
 	cfg, err := config.LoadDefaultConfig(ctx)
@@ -70,6 +75,21 @@ func handleRestore(ctx context.Context, s3Client *s3.Client, s3ControlClient *s3
 	}
 
 	log.Println("Restore process completed")
+	// Send notification email
+	emailSender := notification.NewSMTPEmailSender()
+	subject := fmt.Sprintf("Asset Restore Completed for Project %d", params.ProjectId)
+	emailBody := fmt.Sprintf(
+		"Project Asset Restore Completed.\n\n"+
+			"User requesting restore: %v\n"+
+			"Retrieval Type: %v\n",
+		params.User, params.RetrievalType)
+	log.Printf("Sending notification email to %v", params.User)
+	err = emailSender.SendEmail(subject, emailBody)
+
+	if err != nil {
+		return fmt.Errorf("failed to send notification: %w", err)
+	}
+
 	return nil
 }
 
