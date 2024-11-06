@@ -105,7 +105,7 @@ func handleRestore(ctx context.Context, s3Client *s3.Client, s3ControlClient *s3
 			"Project URL: %v%v",
 		params.User,
 		params.RetrievalType,
-		os.Getenv("PLUTO_PROJECT_URL"),
+		params.PlutoProjectURL,
 		params.ProjectId,
 	)
 
