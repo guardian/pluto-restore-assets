@@ -45,6 +45,7 @@ func main() {
 	mux.HandleFunc("POST /stats", restoreHandler.GetStatus)
 	mux.HandleFunc("GET /health", healthHandler)
 	mux.HandleFunc("POST /notify", restoreHandler.Notify)
+	mux.HandleFunc("POST /permissions", restoreHandler.Permissions)
 
 	// Add logging middleware
 	handler := LoggingMiddleware(mux)

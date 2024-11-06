@@ -279,3 +279,29 @@ func (h *RestoreHandler) Notify(w http.ResponseWriter, r *http.Request) {
 		"message": "Notification sent successfully",
 	})
 }
+
+func (h *RestoreHandler) Permissions(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		User string `json:"user"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "Failed to parse request body", http.StatusBadRequest)
+		return
+	}
+
+	allowedUsers := strings.Split(os.Getenv("ALLOWED_USERS"), ",")
+	isAllowed := false
+
+	for _, user := range allowedUsers {
+		if strings.TrimSpace(user) == body.User {
+			isAllowed = true
+			break
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]bool{
+		"allowed": isAllowed,
+	})
+}
