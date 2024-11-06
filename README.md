@@ -11,6 +11,7 @@ Pluto Restore Assets is a service designed to manage and monitor the restoration
 - **Kubernetes Integration**: Runs as containerized services with proper RBAC
 - **AWS S3 Integration**: Manages asset restoration from Glacier
 - **Logging**: Comprehensive request and operation logging
+- **Cost Estimation**: Provides cost estimates for Standard and Bulk retrievals
 
 ## Environment Variables
 
@@ -24,12 +25,17 @@ The application requires the following environment variables:
 - `AWS_SECRET_ACCESS_KEY`: AWS secret access key
 - `AWS_DEFAULT_REGION`: AWS region
 - `WORKER_IMAGE`: Docker image for the worker service
-- `BASE_PATH`: Base path for for local assets
+- `BASE_PATH`: Base path for local assets
+- `SMTP_HOST`: SMTP server hostname
+- `SMTP_PORT`: SMTP server port
+- `SMTP_FROM`: Email sender address
+- `NOTIFICATION_EMAIL`: Email recipient for notifications
+- `PLUTO_PROJECT_URL`: Base URL for project references
 
 ## API Endpoints
 
 - **POST /api/v1/restore**: Create a new restore job
-  - Required fields: `id`, `user`, `path`
+  - Required fields: `id`, `user`, `path`, `retrievalType`
 - **GET /api/v1/restore/{id}**: Get status of a restore job
 - **GET /health**: Health check endpoint
 
@@ -48,6 +54,9 @@ The application requires the following environment variables:
 
 ### Internal Packages
 - `internal/s3utils/`: AWS S3 utility functions
+  - `manifest.go`: Manifest generation
+  - `monitor.go`: Restore status monitoring
+  - `upload.go`: S3 upload operations
 - `internal/types/`: Shared type definitions
 - `pkg/kubernetes/`: Kubernetes integration
 
@@ -59,9 +68,9 @@ The project includes comprehensive tests:
 - S3 Utility Tests: `internal/s3utils/monitor_test.go`
 - Manifest Generation Tests: `internal/s3utils/manifest_test.go`
 
-## Building and Running Locally
+## Building and Running
 
-```
+```bash
 make deploy-latest
 ```
 
