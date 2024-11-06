@@ -101,10 +101,15 @@ func handleRestore(ctx context.Context, s3Client *s3.Client, s3ControlClient *s3
 	emailBody := fmt.Sprintf(
 		"Project Asset Restore Completed.\n\n"+
 			"User requesting restore: %v\n"+
-			"Retrieval Type: %v\n",
-		params.User, params.RetrievalType)
+			"Retrieval Type: %v\n"+
+			"Project URL: %v%v",
+		params.User,
+		params.RetrievalType,
+		os.Getenv("PLUTO_PROJECT_URL"),
+		params.ProjectId,
+	)
 
-	log.Printf("Sending notification email to %v", params.NotificationEmail)
+	log.Printf("Attempting to send email using SMTP server: %s:%s", params.SMTPHost, params.SMTPPort)
 	err = emailSender.SendEmail(subject, emailBody)
 
 	if err != nil {

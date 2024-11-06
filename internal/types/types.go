@@ -20,6 +20,7 @@ type RestoreParams struct {
 	SMTPHost              string   `json:"smtpHost"`
 	SMTPPort              string   `json:"smtpPort"`
 	NotificationEmail     string   `json:"notificationEmail"`
+	PlutoProjectURL       string   `json:"plutoProjectURL"`
 }
 
 type RequestBody struct {
