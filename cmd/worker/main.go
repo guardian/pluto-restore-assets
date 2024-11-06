@@ -30,16 +30,6 @@ func main() {
 	os.Setenv("AWS_ACCESS_KEY_ID", params.AWS_ACCESS_KEY_ID)
 	os.Setenv("AWS_SECRET_ACCESS_KEY", params.AWS_SECRET_ACCESS_KEY)
 	os.Setenv("AWS_DEFAULT_REGION", params.AWS_DEFAULT_REGION)
-	os.Setenv("SMTP_FROM", params.SMTPFrom)
-	os.Setenv("SMTP_HOST", params.SMTPHost)
-	os.Setenv("SMTP_PORT", params.SMTPPort)
-	os.Setenv("NOTIFICATION_EMAIL", params.NotificationEmail)
-
-	// Verify these are not empty strings
-	log.Printf("Setting SMTP settings - Host: %s, Port: %s", params.SMTPHost, params.SMTPPort)
-	os.Setenv("SMTP_HOST", params.SMTPHost)
-	os.Setenv("SMTP_PORT", params.SMTPPort)
-	os.Setenv("SMTP_FROM", params.SMTPFrom)
 
 	ctx := context.Background()
 	cfg, err := config.LoadDefaultConfig(ctx)
@@ -81,15 +71,6 @@ func handleRestore(ctx context.Context, s3Client *s3.Client, s3ControlClient *s3
 	}
 
 	log.Println("Restore process completed")
-	// Add debug logging for SMTP settings
-	log.Printf("SMTP Settings - Host: %s, Port: %s, From: %s, To: %s",
-		os.Getenv("SMTP_HOST"),
-		os.Getenv("SMTP_PORT"),
-		os.Getenv("SMTP_FROM"),
-		params.NotificationEmail)
-
-	// Set notification email explicitly since it's in params
-	os.Setenv("NOTIFICATION_EMAIL", params.NotificationEmail)
 
 	emailSender := notification.NewSMTPEmailSender(
 		params.SMTPHost,
@@ -143,9 +124,6 @@ func downloadManifest(ctx context.Context, s3Client *s3.Client, params types.Res
 }
 
 func initiateRestore(ctx context.Context, s3Client *s3.Client, s3ControlClient *s3control.Client, params types.RestoreParams) (string, error) {
-	// if _, err := s3utils.UploadFileToS3(ctx, s3Client, params.ManifestBucket, params.ManifestKey, params.ManifestLocalPath); err != nil {
-	// 	return "", fmt.Errorf("upload manifest: %w", err)
-	// }
 
 	accountID, manifestETag, err := getRestoreDetails(ctx, s3Client, params)
 	if err != nil {
