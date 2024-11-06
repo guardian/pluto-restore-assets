@@ -89,6 +89,10 @@ func (h *RestoreHandler) CreateRestore(w http.ResponseWriter, r *http.Request) {
 		RetrievalType:         body.RetrievalType,
 		RestorePath:           GetAWSAssetPath(body.Path),
 		BasePath:              GetBasePath(body.Path),
+		SMTPFrom:              os.Getenv("SMTP_FROM"),
+		SMTPHost:              os.Getenv("SMTP_HOST"),
+		SMTPPort:              os.Getenv("SMTP_PORT"),
+		NotificationEmail:     os.Getenv("NOTIFICATION_EMAIL"),
 	}
 
 	// Generate manifest first
