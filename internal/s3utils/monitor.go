@@ -12,7 +12,6 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/cenkalti/backoff/v4"
 )
 
 func MonitorObjectRestoreStatus(ctx context.Context, client *s3.Client) ([]S3Entry, error) {
@@ -95,35 +94,26 @@ func readManifestFile(filepath string) ([]S3Entry, error) {
 }
 
 func checkRestoreStatus(ctx context.Context, client S3Client, bucket, key string) (bool, error) {
-	operation := func() (bool, error) {
-		resp, err := client.HeadObject(ctx, &s3.HeadObjectInput{
-			Bucket: aws.String(bucket),
-			Key:    aws.String(key),
-		})
-		if err != nil {
-			return false, err
-		}
-
-		if resp.Restore == nil {
-			return false, nil
-		}
-		return !strings.Contains(*resp.Restore, "ongoing-request=\"true\""), nil
+	output, err := client.HeadObject(ctx, &s3.HeadObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return false, fmt.Errorf("head object failed: %w", err)
 	}
 
-	b := backoff.NewExponentialBackOff()
-	b.InitialInterval = 1 * time.Second
-	b.MaxInterval = 30 * time.Second
-	b.MaxElapsedTime = 5 * time.Minute
-	b.RandomizationFactor = 0.5
+	// If the object is not in Glacier, it's already available
+	if output.StorageClass == "" || output.StorageClass == "STANDARD" {
+		log.Printf("Object %s/%s is already in STANDARD storage", bucket, key)
+		return true, nil
+	}
 
-	var restored bool
-	err := backoff.RetryNotify(func() error {
-		var opErr error
-		restored, opErr = operation()
-		return opErr
-	}, b, func(err error, d time.Duration) {
-		log.Printf("Retrying after error: %v", err)
-	})
+	// Check if object is restored
+	if output.Restore != nil {
+		if strings.Contains(*output.Restore, "ongoing-request=\"false\"") {
+			return true, nil
+		}
+	}
 
-	return restored, err
+	return false, nil
 }

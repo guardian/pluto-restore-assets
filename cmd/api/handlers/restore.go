@@ -169,7 +169,7 @@ func (h *RestoreHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
 		ProjectId:             body.ID,
 		User:                  body.User,
 		RetrievalType:         body.RetrievalType,
-		RestorePath:           GetAWSAssetPath(body.Path), //GetAWSAssetPath(body.Path),
+		RestorePath:           GetAWSAssetPath(body.Path),
 		BasePath:              GetBasePath(body.Path),
 		SMTPFrom:              os.Getenv("SMTP_FROM"),
 		SMTPHost:              os.Getenv("SMTP_HOST"),

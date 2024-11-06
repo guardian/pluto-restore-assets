@@ -7,13 +7,10 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 )
-
-func (m *MockS3Client) Client() *s3.Client {
-	return &s3.Client{}
-}
 
 func TestCheckRestoreStatus(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
@@ -24,33 +21,47 @@ func TestCheckRestoreStatus(t *testing.T) {
 	tests := []struct {
 		name           string
 		restoreHeader  *string
+		storageClass   types.StorageClass
 		expectedResult bool
 		expectError    bool
 	}{
 		{
 			name:           "Ongoing restore",
 			restoreHeader:  aws.String(`ongoing-request="true"`),
+			storageClass:   types.StorageClassGlacier,
 			expectedResult: false,
 			expectError:    false,
 		},
 		{
 			name:           "Completed restore",
 			restoreHeader:  aws.String(`ongoing-request="false", expiry-date="Wed, 07 Oct 2020 00:00:00 GMT"`),
+			storageClass:   types.StorageClassGlacier,
 			expectedResult: true,
 			expectError:    false,
 		},
 		{
 			name:           "No restore header",
 			restoreHeader:  nil,
+			storageClass:   types.StorageClassGlacier,
 			expectedResult: false,
+			expectError:    false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockS3Client.EXPECT().HeadObject(gomock.Any(), gomock.Any()).Return(&s3.HeadObjectOutput{
-				Restore: tt.restoreHeader,
-			}, nil)
+			mockS3Client.EXPECT().
+				HeadObject(
+					gomock.Any(),
+					&s3.HeadObjectInput{
+						Bucket: aws.String("test-bucket"),
+						Key:    aws.String("test-key"),
+					},
+				).
+				Return(&s3.HeadObjectOutput{
+					Restore:      tt.restoreHeader,
+					StorageClass: tt.storageClass,
+				}, nil)
 
 			result, err := checkRestoreStatus(context.Background(), mockS3Client, "test-bucket", "test-key")
 
