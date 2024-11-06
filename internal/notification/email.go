@@ -8,18 +8,22 @@ import (
 )
 
 type SMTPEmailSender struct {
-	host string
-	port string
-	from string
-	to   string
+	host   string
+	port   string
+	from   string
+	to     string
+	useTLS bool
 }
 
 func NewSMTPEmailSender(host, port, from, to string) *SMTPEmailSender {
+	useTLS := port != "25"
+
 	return &SMTPEmailSender{
-		host: host,
-		port: port,
-		from: from,
-		to:   to,
+		host:   host,
+		port:   port,
+		from:   from,
+		to:     to,
+		useTLS: useTLS,
 	}
 }
 
@@ -33,19 +37,30 @@ func (s *SMTPEmailSender) SendEmail(subject, body string) error {
 		"\r\n"+
 		"%s\r\n", s.to, s.from, subject, body))
 
-	// Use plain SMTP without TLS for internal mail server
-	err := smtp.SendMail(
-		net.JoinHostPort(s.host, s.port),
-		nil, // No authentication needed for internal mail server
-		s.from,
-		[]string{s.to},
-		msg,
-	)
-
+	// Simple SMTP connection without TLS or auth
+	c, err := smtp.Dial(net.JoinHostPort(s.host, s.port))
 	if err != nil {
-		return fmt.Errorf("failed to send email: %w", err)
+		return fmt.Errorf("failed to connect to SMTP server: %w", err)
+	}
+	defer c.Close()
+
+	if err := c.Mail(s.from); err != nil {
+		return fmt.Errorf("failed to set sender: %w", err)
+	}
+	if err := c.Rcpt(s.to); err != nil {
+		return fmt.Errorf("failed to set recipient: %w", err)
 	}
 
-	log.Printf("Email sent successfully to %s", s.to)
+	w, err := c.Data()
+	if err != nil {
+		return fmt.Errorf("failed to create data writer: %w", err)
+	}
+	defer w.Close()
+
+	_, err = w.Write(msg)
+	if err != nil {
+		return fmt.Errorf("failed to write message: %w", err)
+	}
+
 	return nil
 }
