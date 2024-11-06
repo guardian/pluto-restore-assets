@@ -26,5 +26,25 @@ func (s *SMTPEmailSender) SendEmail(subject, body string) error {
 	to := os.Getenv("NOTIFICATION_EMAIL")
 	msg := fmt.Sprintf("Subject: %s\n\n%s", subject, body)
 
-	return smtp.SendMail(s.host+":"+s.port, nil, s.from, []string{to}, []byte(msg))
+	client, err := smtp.Dial(s.host + ":" + s.port)
+	if err != nil {
+		return fmt.Errorf("failed to connect to SMTP server: %v", err)
+	}
+	defer client.Close()
+
+	if err := client.Mail(s.from); err != nil {
+		return fmt.Errorf("MAIL FROM error: %v", err)
+	}
+	if err := client.Rcpt(to); err != nil {
+		return fmt.Errorf("RCPT TO error: %v", err)
+	}
+
+	w, err := client.Data()
+	if err != nil {
+		return fmt.Errorf("DATA error: %v", err)
+	}
+	defer w.Close()
+
+	_, err = w.Write([]byte(msg))
+	return err
 }
