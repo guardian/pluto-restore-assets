@@ -254,15 +254,14 @@ func (h *RestoreHandler) Notify(w http.ResponseWriter, r *http.Request) {
 	emailSender := notification.NewSMTPEmailSender()
 	subject := fmt.Sprintf("Asset Restore Stats - Project %d", body.ID)
 	emailBody := fmt.Sprintf(
-		"Asset Restore Statistics\n"+
-			"Project ID: %d\n"+
-			"User: %s\n"+
-			"Path: %s\n"+
+		"Project Asset Restore Request\n\n"+
+			"User requesting restore: %v\n"+
+			"Url: %v%v\n"+
 			"Total Files: %d\n"+
 			"Total Size: %.2f GB\n"+
 			"Standard Retrieval Cost: $%.2f\n"+
 			"Bulk Retrieval Cost: $%.2f",
-		body.ID, body.User, body.Path,
+		body.User, os.Getenv("PLUTO_PROJECT_URL"), body.ID,
 		cachedStats.FileCount,
 		float64(cachedStats.TotalSize)/(1024*1024*1024),
 		cachedStats.StandardCost,
