@@ -2,9 +2,14 @@ package s3utils
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"os"
 	"path/filepath"
+	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
@@ -54,42 +59,42 @@ func downloadFile(ctx context.Context, client *s3.Client, bucket, key, basePath 
 	log.Printf("Downloading %s/%s to %s", bucket, key, fullPath)
 	log.Printf("Directory: %s", dir)
 
-	// if err := os.MkdirAll(dir, 0755); err != nil {
-	// 	return fmt.Errorf("failed to create directory %s: %w", dir, err)
-	// }
+	// Create directory if it doesn't exist, ignore if it does
+	if err := os.MkdirAll(dir, 0755); err != nil && !os.IsExist(err) {
+		return fmt.Errorf("failed to create directory %s: %w", dir, err)
+	}
 
-	// filename := filepath.Base(fullPath)
-	// ext := filepath.Ext(filename)
-	// name := strings.TrimSuffix(filename, ext)
+	filename := filepath.Base(fullPath)
+	ext := filepath.Ext(filename)
+	name := strings.TrimSuffix(filename, ext)
 
-	// for i := 0; ; i++ {
-	// 	newPath := fullPath
-	// 	if i > 0 {
-	// 		newPath = filepath.Join(dir, fmt.Sprintf("%s_%d%s", name, i, ext))
-	// 	}
-	// 	if _, err := os.Stat(newPath); os.IsNotExist(err) {
-	// 		fullPath = newPath
-	// 		break
-	// 	}
-	// }
+	finalPath := fullPath
+	counter := 1
+	for {
+		if _, err := os.Stat(finalPath); os.IsNotExist(err) {
+			break
+		}
+		finalPath = filepath.Join(dir, fmt.Sprintf("%s_%d%s", name, counter, ext))
+		counter++
+	}
 
-	// file, err := os.Create(fullPath)
-	// if err != nil {
-	// 	return fmt.Errorf("failed to create file %s: %w", fullPath, err)
-	// }
-	// defer file.Close()
+	// Create and download file
+	file, err := os.OpenFile(finalPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to create file %s: %w", finalPath, err)
+	}
+	defer file.Close()
 
-	// downloader := manager.NewDownloader(client)
+	downloader := manager.NewDownloader(client)
+	_, err = downloader.Download(ctx, file, &s3.GetObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	})
 
-	// _, err = downloader.Download(ctx, file, &s3.GetObjectInput{
-	// 	Bucket: aws.String(bucket),
-	// 	Key:    aws.String(key),
-	// })
+	if err != nil {
+		return fmt.Errorf("failed to download file %s/%s: %w", bucket, key, err)
+	}
 
-	// if err != nil {
-	// 	return fmt.Errorf("failed to download file %s/%s: %w", bucket, key, err)
-	// }
-
-	log.Printf("Successfully downloaded %s/%s to %s", bucket, key, fullPath)
+	log.Printf("Successfully downloaded %s/%s to %s", bucket, key, finalPath)
 	return nil
 }
