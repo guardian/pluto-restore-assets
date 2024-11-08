@@ -63,7 +63,6 @@ func (jc *JobCreator) CreateRestoreJob(params types.RestoreParams) error {
 			Name: jobName,
 		},
 		Spec: batchv1.JobSpec{
-
 			TTLSecondsAfterFinished: &ttlSeconds,
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
@@ -75,6 +74,23 @@ func (jc *JobCreator) CreateRestoreJob(params types.RestoreParams) error {
 								{
 									Name:  "RESTORE_PARAMS",
 									Value: string(paramsJSON),
+								},
+							},
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "multimedia-volume",
+									MountPath: "/srv/Multimedia2",
+								},
+							},
+						},
+					},
+					Volumes: []corev1.Volume{
+						{
+							Name: "multimedia-volume",
+							VolumeSource: corev1.VolumeSource{
+								HostPath: &corev1.HostPathVolumeSource{
+									Path: os.Getenv("WORKER_HOST_PATH"),
+									Type: &[]corev1.HostPathType{corev1.HostPathDirectory}[0],
 								},
 							},
 						},
