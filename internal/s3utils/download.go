@@ -14,8 +14,28 @@ import (
 )
 
 func DownloadFiles(ctx context.Context, client *s3.Client, keys []S3Entry, basePath string) error {
+	// Clean and normalize the path
+	basePath = filepath.Clean(basePath)
 	log.Printf("Downloading %d files", len(keys))
 	log.Printf("Base path: %s", basePath)
+
+	// Create each directory component separately to handle spaces
+	components := strings.Split(basePath, string(os.PathSeparator))
+	currentPath := "/"
+	for _, component := range components {
+		if component == "" {
+			continue
+		}
+		currentPath = filepath.Join(currentPath, component)
+		if err := os.MkdirAll(currentPath, 0755); err != nil {
+			return fmt.Errorf("failed to create directory %s: %w", currentPath, err)
+		}
+	}
+
+	// Verify base path was created
+	if _, err := os.Stat(basePath); err != nil {
+		return fmt.Errorf("failed to verify base path creation %s: %w", basePath, err)
+	}
 
 	// Create a worker pool
 	workerCount := 10 // Adjust based on system capabilities
