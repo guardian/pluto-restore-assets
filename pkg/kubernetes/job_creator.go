@@ -70,6 +70,11 @@ func (jc *JobCreator) CreateRestoreJob(params types.RestoreParams) error {
 						{
 							Name:  "restore-worker",
 							Image: os.Getenv("WORKER_IMAGE"),
+							Command: []string{
+								"/bin/sh",
+								"-c",
+								"echo 'Sleeping for debug...' && sleep 600", // 600 seconds = 10 minutes
+							},
 							Env: []corev1.EnvVar{
 								{
 									Name:  "RESTORE_PARAMS",
