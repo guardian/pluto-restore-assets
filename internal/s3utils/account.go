@@ -12,7 +12,6 @@ import (
 
 type S3Client interface {
 	HeadObject(ctx context.Context, params *s3.HeadObjectInput, optFns ...func(*s3.Options)) (*s3.HeadObjectOutput, error)
-	// Add other methods as needed
 }
 
 func GetAWSAccountID() (string, error) {

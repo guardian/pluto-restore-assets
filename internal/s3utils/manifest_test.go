@@ -139,7 +139,6 @@ func TestGenerateCSVManifest(t *testing.T) {
 				"test-prefix/shared.txt": "bucket1", // First bucket takes precedence
 			},
 		},
-		// Add more test cases here
 	}
 
 	for _, tc := range testCases {
