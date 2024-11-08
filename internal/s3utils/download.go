@@ -73,11 +73,7 @@ func downloadFile(ctx context.Context, client *s3.Client, bucket, key, basePath 
 	fullPath := filepath.Join(basePath, key)
 	dir := filepath.Dir(fullPath)
 
-	// Check if base path exists and is writable
-	if _, err := os.Stat(basePath); err != nil {
-		return fmt.Errorf("base path error: %w", err)
-	}
-
+	log.Printf("Attempting to create directory: %s", dir)
 	// Create directory with verbose error checking
 	err := os.MkdirAll(dir, 0755)
 	if err != nil {
@@ -87,24 +83,15 @@ func downloadFile(ctx context.Context, client *s3.Client, bucket, key, basePath 
 		log.Printf("Directory already exists: %s", dir)
 	}
 
-	// Verify directory was created
-	if _, err := os.Stat(dir); err != nil {
-		return fmt.Errorf("failed to verify directory creation %s: %w", dir, err)
+	// Check directory permissions after creation
+	dirInfo, err := os.Stat(dir)
+	if err != nil {
+		return fmt.Errorf("failed to stat directory %s: %w", dir, err)
 	}
-
-	filename := filepath.Base(fullPath)
-	ext := filepath.Ext(filename)
-	name := strings.TrimSuffix(filename, ext)
+	log.Printf("Directory permissions: %v", dirInfo.Mode())
 
 	finalPath := fullPath
-	counter := 1
-	for {
-		if _, err := os.Stat(finalPath); os.IsNotExist(err) {
-			break
-		}
-		finalPath = filepath.Join(dir, fmt.Sprintf("%s_%d%s", name, counter, ext))
-		counter++
-	}
+	log.Printf("Attempting to create file: %s", finalPath)
 
 	// Try to create file with verbose error checking
 	file, err := os.OpenFile(finalPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
@@ -112,11 +99,6 @@ func downloadFile(ctx context.Context, client *s3.Client, bucket, key, basePath 
 		return fmt.Errorf("failed to create file %s (permissions/space issue?): %w", finalPath, err)
 	}
 	defer file.Close()
-
-	// Verify file was created
-	if _, err := os.Stat(finalPath); err != nil {
-		return fmt.Errorf("failed to verify file creation %s: %w", finalPath, err)
-	}
 
 	log.Printf("Starting download to %s", finalPath)
 	downloader := manager.NewDownloader(client)
@@ -130,6 +112,14 @@ func downloadFile(ctx context.Context, client *s3.Client, bucket, key, basePath 
 		os.Remove(finalPath)
 		return fmt.Errorf("failed to download file %s/%s: %w", bucket, key, err)
 	}
+
+	// Verify file was written
+	fileInfo, err := os.Stat(finalPath)
+	if err != nil {
+		return fmt.Errorf("failed to stat downloaded file %s: %w", finalPath, err)
+	}
+	log.Printf("File size on disk: %d bytes", fileInfo.Size())
+	log.Printf("File permissions: %v", fileInfo.Mode())
 
 	log.Printf("Successfully downloaded %s/%s to %s (%d bytes)", bucket, key, finalPath, numBytes)
 	return nil
