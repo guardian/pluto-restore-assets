@@ -53,15 +53,23 @@ func downloadFile(ctx context.Context, client *s3.Client, bucket, key, basePath 
 	fullPath := filepath.Join(basePath, key)
 	dir := filepath.Dir(fullPath)
 
-	log.Printf("ctx: %v", ctx)
-	log.Printf("client: %v", client)
+	// Check if base path exists and is writable
+	if _, err := os.Stat(basePath); err != nil {
+		return fmt.Errorf("base path error: %w", err)
+	}
 
-	log.Printf("Downloading %s/%s to %s", bucket, key, fullPath)
-	log.Printf("Directory: %s", dir)
+	// Create directory with verbose error checking
+	err := os.MkdirAll(dir, 0755)
+	if err != nil {
+		if !os.IsExist(err) {
+			return fmt.Errorf("failed to create directory %s: %w", dir, err)
+		}
+		log.Printf("Directory already exists: %s", dir)
+	}
 
-	// Create directory if it doesn't exist, ignore if it does
-	if err := os.MkdirAll(dir, 0755); err != nil && !os.IsExist(err) {
-		return fmt.Errorf("failed to create directory %s: %w", dir, err)
+	// Verify directory was created
+	if _, err := os.Stat(dir); err != nil {
+		return fmt.Errorf("failed to verify directory creation %s: %w", dir, err)
 	}
 
 	filename := filepath.Base(fullPath)
@@ -78,23 +86,31 @@ func downloadFile(ctx context.Context, client *s3.Client, bucket, key, basePath 
 		counter++
 	}
 
-	// Create and download file
+	// Try to create file with verbose error checking
 	file, err := os.OpenFile(finalPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
 	if err != nil {
-		return fmt.Errorf("failed to create file %s: %w", finalPath, err)
+		return fmt.Errorf("failed to create file %s (permissions/space issue?): %w", finalPath, err)
 	}
 	defer file.Close()
 
+	// Verify file was created
+	if _, err := os.Stat(finalPath); err != nil {
+		return fmt.Errorf("failed to verify file creation %s: %w", finalPath, err)
+	}
+
+	log.Printf("Starting download to %s", finalPath)
 	downloader := manager.NewDownloader(client)
-	_, err = downloader.Download(ctx, file, &s3.GetObjectInput{
+	numBytes, err := downloader.Download(ctx, file, &s3.GetObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),
 	})
 
 	if err != nil {
+		// Clean up the empty file if download failed
+		os.Remove(finalPath)
 		return fmt.Errorf("failed to download file %s/%s: %w", bucket, key, err)
 	}
 
-	log.Printf("Successfully downloaded %s/%s to %s", bucket, key, finalPath)
+	log.Printf("Successfully downloaded %s/%s to %s (%d bytes)", bucket, key, finalPath, numBytes)
 	return nil
 }
