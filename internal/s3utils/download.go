@@ -73,9 +73,8 @@ func downloadFile(ctx context.Context, client *s3.Client, bucket, key, basePath 
 	fullPath := filepath.Join(basePath, key)
 	dir := filepath.Dir(fullPath)
 
-	log.Printf("Attempting to create directory: %s", dir)
-	// Create directory with verbose error checking
-	err := os.MkdirAll(dir, 0755)
+	// Create directory with correct permissions (0775 = drwxrwxr-x)
+	err := os.MkdirAll(dir, 0775)
 	if err != nil {
 		if !os.IsExist(err) {
 			return fmt.Errorf("failed to create directory %s: %w", dir, err)
@@ -83,20 +82,16 @@ func downloadFile(ctx context.Context, client *s3.Client, bucket, key, basePath 
 		log.Printf("Directory already exists: %s", dir)
 	}
 
-	// Check directory permissions after creation
-	dirInfo, err := os.Stat(dir)
-	if err != nil {
-		return fmt.Errorf("failed to stat directory %s: %w", dir, err)
+	// Set directory ownership
+	if err := os.Chown(dir, 501, 696631985); err != nil {
+		return fmt.Errorf("failed to set directory ownership %s: %w", dir, err)
 	}
-	log.Printf("Directory permissions: %v", dirInfo.Mode())
 
 	finalPath := fullPath
-	log.Printf("Attempting to create file: %s", finalPath)
-
-	// Try to create file with verbose error checking
-	file, err := os.OpenFile(finalPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
+	// Create file with correct permissions (0664 = rw-rw-r--)
+	file, err := os.OpenFile(finalPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0664)
 	if err != nil {
-		return fmt.Errorf("failed to create file %s (permissions/space issue?): %w", finalPath, err)
+		return fmt.Errorf("failed to create file %s: %w", finalPath, err)
 	}
 	defer file.Close()
 
@@ -106,20 +101,15 @@ func downloadFile(ctx context.Context, client *s3.Client, bucket, key, basePath 
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),
 	})
-
 	if err != nil {
-		// Clean up the empty file if download failed
 		os.Remove(finalPath)
 		return fmt.Errorf("failed to download file %s/%s: %w", bucket, key, err)
 	}
 
-	// Verify file was written
-	fileInfo, err := os.Stat(finalPath)
-	if err != nil {
-		return fmt.Errorf("failed to stat downloaded file %s: %w", finalPath, err)
+	// Set file ownership
+	if err := os.Chown(finalPath, 501, 696631985); err != nil {
+		return fmt.Errorf("failed to set file ownership %s: %w", finalPath, err)
 	}
-	log.Printf("File size on disk: %d bytes", fileInfo.Size())
-	log.Printf("File permissions: %v", fileInfo.Mode())
 
 	log.Printf("Successfully downloaded %s/%s to %s (%d bytes)", bucket, key, finalPath, numBytes)
 	return nil
