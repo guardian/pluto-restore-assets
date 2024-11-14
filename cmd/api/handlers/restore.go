@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"pluto-restore-assets/internal/types"
+	"strconv"
 	"strings"
 	"time"
 
@@ -94,6 +95,8 @@ func (h *RestoreHandler) CreateRestore(w http.ResponseWriter, r *http.Request) {
 		SMTPPort:              os.Getenv("SMTP_PORT"),
 		NotificationEmail:     os.Getenv("NOTIFICATION_EMAIL"),
 		PlutoProjectURL:       os.Getenv("PLUTO_PROJECT_URL"),
+		FileOwnerUID:          envToInt("FILE_OWNER_UID"),
+		FileOwnerGID:          envToInt("FILE_OWNER_GID"),
 	}
 
 	// Generate manifest first
@@ -140,6 +143,11 @@ func GetBasePath(fullPath string) string {
 		return parts[0] + "/Assets/"
 	}
 	return fullPath
+}
+
+func envToInt(key string) int {
+	i, _ := strconv.Atoi(os.Getenv(key))
+	return i
 }
 
 func (h *RestoreHandler) GetStatus(w http.ResponseWriter, r *http.Request) {

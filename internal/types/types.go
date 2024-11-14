@@ -21,6 +21,8 @@ type RestoreParams struct {
 	SMTPPort              string   `json:"smtpPort"`
 	NotificationEmail     string   `json:"notificationEmail"`
 	PlutoProjectURL       string   `json:"plutoProjectURL"`
+	FileOwnerUID          int      `json:"file_owner_uid"`
+	FileOwnerGID          int      `json:"file_owner_gid"`
 }
 
 type RequestBody struct {

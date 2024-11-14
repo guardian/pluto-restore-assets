@@ -65,7 +65,7 @@ func handleRestore(ctx context.Context, s3Client *s3.Client, s3ControlClient *s3
 	if keys, err := s3utils.MonitorObjectRestoreStatus(ctx, s3Client); err != nil {
 		return fmt.Errorf("monitor restore: %w", err)
 	} else {
-		if err := s3utils.DownloadFiles(ctx, s3Client, keys, params.BasePath); err != nil {
+		if err := s3utils.DownloadFiles(ctx, s3Client, keys, params.BasePath, params.FileOwnerUID, params.FileOwnerGID); err != nil {
 			return fmt.Errorf("download files: %w", err)
 		}
 	}

@@ -13,7 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
-func DownloadFiles(ctx context.Context, client *s3.Client, keys []S3Entry, basePath string) error {
+func DownloadFiles(ctx context.Context, client *s3.Client, keys []S3Entry, basePath string, uid, gid int) error {
 	// Clean and normalize the path
 	basePath = filepath.Clean(basePath)
 	log.Printf("Downloading %d files", len(keys))
@@ -44,7 +44,7 @@ func DownloadFiles(ctx context.Context, client *s3.Client, keys []S3Entry, baseP
 
 	// Start worker pool
 	for w := 1; w <= workerCount; w++ {
-		go worker(ctx, client, basePath, jobs, results)
+		go worker(ctx, client, basePath, jobs, results, uid, gid)
 	}
 
 	// Send jobs to workers
@@ -63,13 +63,13 @@ func DownloadFiles(ctx context.Context, client *s3.Client, keys []S3Entry, baseP
 	return nil
 }
 
-func worker(ctx context.Context, client *s3.Client, basePath string, jobs <-chan S3Entry, results chan<- error) {
+func worker(ctx context.Context, client *s3.Client, basePath string, jobs <-chan S3Entry, results chan<- error, uid, gid int) {
 	for job := range jobs {
-		results <- downloadFile(ctx, client, job.Bucket, job.Key, basePath)
+		results <- downloadFile(ctx, client, job.Bucket, job.Key, basePath, uid, gid)
 	}
 }
 
-func downloadFile(ctx context.Context, client *s3.Client, bucket, key, basePath string) error {
+func downloadFile(ctx context.Context, client *s3.Client, bucket, key, basePath string, uid, gid int) error {
 	fullPath := filepath.Join(basePath, key)
 	dir := filepath.Dir(fullPath)
 
@@ -83,7 +83,7 @@ func downloadFile(ctx context.Context, client *s3.Client, bucket, key, basePath 
 	}
 
 	// Set directory ownership
-	if err := os.Chown(dir, 501, 696631985); err != nil {
+	if err := os.Chown(dir, uid, gid); err != nil {
 		return fmt.Errorf("failed to set directory ownership %s: %w", dir, err)
 	}
 
@@ -107,7 +107,7 @@ func downloadFile(ctx context.Context, client *s3.Client, bucket, key, basePath 
 	}
 
 	// Set file ownership
-	if err := os.Chown(finalPath, 501, 696631985); err != nil {
+	if err := os.Chown(finalPath, uid, gid); err != nil {
 		return fmt.Errorf("failed to set file ownership %s: %w", finalPath, err)
 	}
 
