@@ -1,0 +1,79 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: IAM resources for pluto-asset-restore
+
+Parameters:
+  AssetBuckets:
+    Type: CommaDelimitedList
+    Description: Comma-separated list of S3 asset bucket names
+  
+  ManifestBucket:
+    Type: String
+    Description: Name of the S3 bucket for storing manifests and job reports
+  
+  RoleName:
+    Type: String
+    Description: Name of the IAM role to create
+
+Resources:
+  ProjectRestorePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: Policy for pluto-asset-restore restore operations
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowReadAccessToAssetBuckets
+            Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:ListBucket
+              - s3:RestoreObject
+            Resource:
+              - !Join ['', ['arn:aws:s3:::', !Select [0, !Ref AssetBuckets]]]
+              - !Join ['', ['arn:aws:s3:::', !Select [0, !Ref AssetBuckets], '/*']]
+              - !Join ['', ['arn:aws:s3:::', !Select [1, !Ref AssetBuckets]]]
+              - !Join ['', ['arn:aws:s3:::', !Select [1, !Ref AssetBuckets], '/*']]
+          
+          - Sid: AllowManifestOperations
+            Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:PutObject
+              - s3:GetObjectVersion
+              - s3:ListBucket
+            Resource:
+              - !Sub 'arn:aws:s3:::${ManifestBucket}'
+              - !Sub 'arn:aws:s3:::${ManifestBucket}/*'
+          
+          - Sid: AllowPassRole
+            Effect: Allow
+            Action: iam:PassRole
+            Resource: !Sub 'arn:aws:iam::${AWS::AccountId}:role/${RoleName}'
+
+  ProjectRestoreRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Ref RoleName
+      Description: Role for pluto-asset-restore restore operations
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - batchoperations.s3.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref ProjectRestorePolicy
+
+Outputs:
+  RoleARN:
+    Description: ARN of the created IAM Role
+    Value: !GetAtt ProjectRestoreRole.Arn
+  RoleName:
+    Description: Name of the created IAM Role
+    Value: !Ref ProjectRestoreRole
+  PolicyARN:
+    Description: ARN of the created IAM Policy
+    Value: !Ref ProjectRestorePolicy
