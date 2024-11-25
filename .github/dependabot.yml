@@ -12,16 +12,12 @@ updates:
     commit-message:
       prefix: "go"
       include: "scope"
-    # Add secrets access for Go updates
-    secrets:
-      - AWS_REGION
-      - AWS_ROLE_TO_ASSUME
 
   # API Dockerfile
   - package-ecosystem: "docker"
     directory: "/cmd/api"
     schedule:
-      interval: "weekly"
+      interval: "daily"
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
@@ -30,16 +26,12 @@ updates:
     commit-message:
       prefix: "docker"
       include: "scope"
-    # Add secrets access for API Docker updates
-    secrets:
-      - AWS_REGION
-      - AWS_ROLE_TO_ASSUME
 
   # Worker Dockerfile
   - package-ecosystem: "docker"
     directory: "/cmd/worker"
     schedule:
-      interval: "weekly"
+      interval: "daily"
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
@@ -48,7 +40,3 @@ updates:
     commit-message:
       prefix: "docker"
       include: "scope"
-    # Add secrets access for Worker Docker updates
-    secrets:
-      - AWS_REGION
-      - AWS_ROLE_TO_ASSUME
