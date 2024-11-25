@@ -71,33 +71,9 @@ func (h *RestoreHandler) CreateRestore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	parts := strings.Split(body.User, "@")[0]
-	user := strings.Replace(parts, ".", "_", 1)
-
 	log.Printf("Received request body: %+v", body)
 
-	params := types.RestoreParams{
-		AssetBucketList:       strings.Split(os.Getenv("ASSET_BUCKET_LIST"), ","),
-		ManifestBucket:        os.Getenv("MANIFEST_BUCKET"),
-		ManifestKey:           fmt.Sprintf("batch-manifests/%d_%v_%s.csv", body.ID, user, time.Now().Format("2006-01-02_15-04-05")),
-		ManifestLocalPath:     "/tmp/manifest.csv",
-		RoleArn:               os.Getenv("AWS_ROLE_ARN"),
-		AWS_ACCESS_KEY_ID:     os.Getenv("AWS_ACCESS_KEY_ID"),
-		AWS_SECRET_ACCESS_KEY: os.Getenv("AWS_SECRET_ACCESS_KEY"),
-		AWS_DEFAULT_REGION:    os.Getenv("AWS_DEFAULT_REGION"),
-		ProjectId:             body.ID,
-		User:                  body.User,
-		RetrievalType:         body.RetrievalType,
-		RestorePath:           GetAWSAssetPath(body.Path),
-		BasePath:              GetBasePath(body.Path),
-		SMTPFrom:              os.Getenv("SMTP_FROM"),
-		SMTPHost:              os.Getenv("SMTP_HOST"),
-		SMTPPort:              os.Getenv("SMTP_PORT"),
-		NotificationEmail:     os.Getenv("NOTIFICATION_EMAIL"),
-		PlutoProjectURL:       os.Getenv("PLUTO_PROJECT_URL"),
-		FileOwnerUID:          envToInt("FILE_OWNER_UID"),
-		FileOwnerGID:          envToInt("FILE_OWNER_GID"),
-	}
+	params := h.createRestoreParams(body)
 
 	// Generate manifest first
 	stats, err := s3utils.GenerateCSVManifest(r.Context(), h.s3Client, params)
@@ -165,26 +141,7 @@ func (h *RestoreHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	params := types.RestoreParams{
-		AssetBucketList:       strings.Split(os.Getenv("ASSET_BUCKET_LIST"), ","),
-		ManifestBucket:        os.Getenv("MANIFEST_BUCKET"),
-		ManifestKey:           fmt.Sprintf("batch-manifests/%d_%v_%s.csv", body.ID, body.User, time.Now().Format("2006-01-02_15-04-05")),
-		ManifestLocalPath:     "/tmp/manifest.csv",
-		RoleArn:               os.Getenv("AWS_ROLE_ARN"),
-		AWS_ACCESS_KEY_ID:     os.Getenv("AWS_ACCESS_KEY_ID"),
-		AWS_SECRET_ACCESS_KEY: os.Getenv("AWS_SECRET_ACCESS_KEY"),
-		AWS_DEFAULT_REGION:    os.Getenv("AWS_DEFAULT_REGION"),
-		ProjectId:             body.ID,
-		User:                  body.User,
-		RetrievalType:         body.RetrievalType,
-		RestorePath:           GetAWSAssetPath(body.Path),
-		BasePath:              GetBasePath(body.Path),
-		SMTPFrom:              os.Getenv("SMTP_FROM"),
-		SMTPHost:              os.Getenv("SMTP_HOST"),
-		SMTPPort:              os.Getenv("SMTP_PORT"),
-		NotificationEmail:     os.Getenv("NOTIFICATION_EMAIL"),
-		PlutoProjectURL:       os.Getenv("PLUTO_PROJECT_URL"),
-	}
+	params := h.createRestoreParams(body)
 
 	stats, err := s3utils.GenerateCSVManifest(r.Context(), h.s3Client, params)
 	if err != nil {
@@ -227,6 +184,34 @@ const (
 	// Data transfer cost
 	DATA_TRANSFER_COST_PER_GB = 0.09 // $0.09 per GB
 )
+
+func (h *RestoreHandler) createRestoreParams(body types.RequestBody) types.RestoreParams {
+	parts := strings.Split(body.User, "@")[0]
+	user := strings.Replace(parts, ".", "_", 1)
+
+	return types.RestoreParams{
+		AssetBucketList:       strings.Split(os.Getenv("ASSET_BUCKET_LIST"), ","),
+		ManifestBucket:        os.Getenv("MANIFEST_BUCKET"),
+		ManifestKey:           fmt.Sprintf("batch-manifests/%d_%v_%s.csv", body.ID, user, time.Now().Format("2006-01-02_15-04-05")),
+		ManifestLocalPath:     "/tmp/manifest.csv",
+		RoleArn:               os.Getenv("AWS_ROLE_ARN"),
+		AWS_ACCESS_KEY_ID:     os.Getenv("AWS_ACCESS_KEY_ID"),
+		AWS_SECRET_ACCESS_KEY: os.Getenv("AWS_SECRET_ACCESS_KEY"),
+		AWS_DEFAULT_REGION:    os.Getenv("AWS_DEFAULT_REGION"),
+		ProjectId:             body.ID,
+		User:                  body.User,
+		RetrievalType:         body.RetrievalType,
+		RestorePath:           GetAWSAssetPath(body.Path),
+		BasePath:              GetBasePath(body.Path),
+		SMTPFrom:              os.Getenv("SMTP_FROM"),
+		SMTPHost:              os.Getenv("SMTP_HOST"),
+		SMTPPort:              os.Getenv("SMTP_PORT"),
+		NotificationEmail:     os.Getenv("NOTIFICATION_EMAIL"),
+		PlutoProjectURL:       os.Getenv("PLUTO_PROJECT_URL"),
+		FileOwnerUID:          envToInt("FILE_OWNER_UID"),
+		FileOwnerGID:          envToInt("FILE_OWNER_GID"),
+	}
+}
 
 func calculateGlacierRetrievalCosts(numberOfFiles float64, totalDataBytes float64) (float64, float64) {
 	// Convert bytes to GB
@@ -276,15 +261,32 @@ func (h *RestoreHandler) Notify(w http.ResponseWriter, r *http.Request) {
 		os.Getenv("NOTIFICATION_EMAIL"),
 	)
 	subject := fmt.Sprintf("Asset Restore Stats - Project %d", body.ID)
-	emailBody := fmt.Sprintf(
-		"Project Asset Restore Request\n\n"+
-			"User requesting restore: %v\n"+
-			"Url: %v%v\n"+
-			"Total Files: %d\n"+
-			"Total Size: %.2f GB\n"+
-			"Standard Retrieval Cost: $%.2f\n"+
-			"Bulk Retrieval Cost: $%.2f",
-		body.User, os.Getenv("PLUTO_PROJECT_URL"), body.ID,
+	emailBody := fmt.Sprintf(`
+Project Asset Restore Request
+============================
+
+Project Details:
+---------------
+• Project ID: %d
+• Project URL: %v%v
+• Requested by: %v
+
+Restore Statistics:
+-----------------
+• Total Files: %d
+• Total Size: %.2f GB
+
+Estimated Costs:
+--------------
+• Standard Retrieval: $%.2f
+• Bulk Retrieval: $%.2f
+
+Note: Bulk retrieval is cheaper but takes longer (up to 12 hours).
+Standard retrieval typically completes within 3-5 hours.
+`,
+		body.ID,
+		os.Getenv("PLUTO_PROJECT_URL"), body.ID,
+		body.User,
 		cachedStats.FileCount,
 		float64(cachedStats.TotalSize)/(1024*1024*1024),
 		cachedStats.StandardCost,
