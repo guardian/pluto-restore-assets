@@ -270,6 +270,7 @@ Project Details:
 • Project ID: %d
 • Project URL: %v%v
 • Requested by: %v
+• Restore Type: %v
 
 Restore Statistics:
 -----------------
@@ -287,6 +288,7 @@ Standard retrieval typically completes within 3-5 hours.
 		body.ID,
 		os.Getenv("PLUTO_PROJECT_URL"), body.ID,
 		body.User,
+		body.RetrievalType,
 		cachedStats.FileCount,
 		float64(cachedStats.TotalSize)/(1024*1024*1024),
 		cachedStats.StandardCost,
