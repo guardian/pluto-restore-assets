@@ -5,7 +5,7 @@ go 1.23.1
 require (
 	github.com/aws/aws-sdk-go-v2 v1.32.5
 	github.com/aws/aws-sdk-go-v2/service/sts v1.33.1
-	k8s.io/apimachinery v0.31.1
+	k8s.io/apimachinery v0.31.3
 )
 
 require (
