@@ -5,7 +5,7 @@ go 1.23.1
 require (
 	github.com/aws/aws-sdk-go-v2 v1.32.5
 	github.com/aws/aws-sdk-go-v2/service/sts v1.33.1
-	k8s.io/apimachinery v0.31.1
+	k8s.io/apimachinery v0.31.4
 )
 
 require (
@@ -71,6 +71,6 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/stretchr/testify v1.9.0
-	k8s.io/api v0.31.1
+	k8s.io/api v0.31.4
 	k8s.io/client-go v0.31.1
 )
